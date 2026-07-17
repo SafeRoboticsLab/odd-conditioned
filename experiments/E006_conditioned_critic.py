@@ -92,9 +92,15 @@ def learned_safe_set(model, theta_grid, omega_grid, odd_feat, obs_mode, device="
 
     with torch.no_grad():
         t = torch.as_tensor(obs, device=device)
-        act, _ = model.predict(obs, deterministic=True)
-        a = torch.as_tensor(np.asarray(act, dtype=np.float32), device=device)
+        # NOT model.predict(): IsaacsPolicy.predict returns the CONTROL action only (it is the
+        # deployment path -- the safety controller with no adversary). The deployed VALUE needs
+        # both players. Query the two actors and concatenate, in the [-1,1] space the critic was
+        # trained on (SB3 stores scale_action'd actions in the replay buffer).
+        a_ctrl = model.policy.actor(t, deterministic=True)
+        a_dstb = model.policy.dstb_actor(t, deterministic=True)
+        a = torch.cat([a_ctrl, a_dstb], dim=1)
         q = model.critic(t, a)
+        # twin critics -> min, matching the conservative target used in training
         q = torch.min(*q) if isinstance(q, (list, tuple)) else q
         V = q.cpu().numpy().reshape(TH.shape)
     return V
@@ -134,25 +140,74 @@ def make_env(odd_mode, obs_mode, fixed_mass=None, seed=0):
     return Monitor(PendulumODD(**kw))
 
 
-def train(arm, steps, fixed_mass, odd_mode, seed, out_dir, device):
+WANDB_PROJECT = "odd-conditioned"      # canonical name from docs/log/experiments.md.
+                                       # NEVER the framework default.
+
+
+def _wandb_init(arm, tag, steps, fixed_mass, odd_mode, seed, git_hash):
+    """project / group / run-name per the project-log skill:
+         project = the canonical name (never the framework default)
+         group   = the experiment name        e.g. E006-conditioned
+         run     = YYYYMMDD-HHMM_<delta>      e.g. 20260716-2015_m8
+    Weights stay LOCAL -- no wandb.save, no weight artifacts.
+    """
+    import wandb
+    from datetime import datetime
+
+    stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    return wandb.init(
+        project=WANDB_PROJECT, group=f"E006-{arm}", name=f"{stamp}_{tag}",
+        config=dict(arm=arm, steps=steps, fixed_mass=fixed_mass, odd_mode=odd_mode,
+                    seed=seed, git=git_hash, algo="IsaacsSAC", net_arch=[128, 128, 128],
+                    lr=5e-4, lr_schedule="STATIC (KL-adaptive is single-player)",
+                    ctrl_action_dim=1, margin_mode="avoid (l_neg -> matches E003 avoid truth)"),
+        reinit=True, save_code=False,
+    )
+
+
+def train(arm, steps, fixed_mass, odd_mode, seed, out_dir, device,
+          truth=None, rungs=(), use_wandb=True, git_hash="unknown"):
     from stable_baselines3.common.vec_env import DummyVecEnv
     from safety_sb3 import IsaacsSAC
 
     obs_mode = "blind" if arm == "blind" else "oracle"
+    tag = arm if fixed_mass is None else f"{arm}_m{fixed_mass:g}"
+    run = _wandb_init(arm, tag, steps, fixed_mass, odd_mode, seed, git_hash) if use_wandb else None
+
     env = DummyVecEnv([lambda: make_env(odd_mode, obs_mode, fixed_mass, seed)])
 
     model = IsaacsSAC(
         "MlpPolicy", env,
+        ctrl_action_dim=1,                  # action = [u, F]: 1 leading ctrl dim, rest is dstb
+        dstb_update_period=1,               # timescale separation knob. The adversary must
+                                            # TRACK its best response or the critic goes
+                                            # optimistic at the hard rungs -- that is the T2
+                                            # staleness hypothesis, so this is a lever, not a
+                                            # default to leave alone.
         learning_rate=5e-4,                 # STATIC. KL-adaptive lr is single-player and
                                             # catastrophic under two-player (see header).
         policy_kwargs=dict(net_arch=[128, 128, 128]),   # the verified recipe, explicit --
                                             # the sandbox's defaults drifted to [512,256,128]
         gamma=0.99, verbose=0, seed=seed, device=device,
+        tensorboard_log=os.path.join(out_dir, "tb") if use_wandb else None,
     )
-    model.learn(total_timesteps=steps, progress_bar=False)
-    tag = arm if fixed_mass is None else f"{arm}_m{fixed_mass:g}"
+
+    cbs = []
+    if truth is not None and rungs:
+        from odd_conditioned.callbacks import ODDSafeSetEval
+        # Return is meaningless here (reward IS the margin, so it only says "did not fall").
+        # What we watch is the learned SET vs the grid's, per rung -- collapse and optimism
+        # are only visible there.
+        cbs.append(ODDSafeSetEval(truth, rungs, obs_mode, eval_freq=max(steps // 8, 5_000),
+                                  use_wandb=use_wandb,
+                                  fig_dir=os.path.join(out_dir, f"overlays_{tag}")))
+
+    model.learn(total_timesteps=steps, progress_bar=False, callback=cbs or None)
+
     p = os.path.join(out_dir, f"{tag}.zip")
-    model.save(p)
+    model.save(p)        # LOCAL only -- never wandb.save / weight artifacts
+    if run is not None:
+        run.finish()
     return model, p
 
 
@@ -168,8 +223,20 @@ def main():
                     help="E003's ground-truth family — scored against directly, no re-solving")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", default="cpu")   # 2-D obs, tiny nets: CPU beats GPU here
+    ap.add_argument("--no-wandb", action="store_true")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
+
+    import subprocess
+    try:
+        git_hash = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"],
+                                           text=True).strip()
+        dirty = subprocess.check_output(["git", "status", "--porcelain"], text=True).strip()
+        if dirty:
+            git_hash += "-DIRTY"      # a dirty launch is a reproducibility hole; record it
+    except Exception:
+        git_hash = "unknown"
+    print(f"code: {git_hash}")
 
     truth = np.load(args.truth)
     th_g, om_g, sweep, Vtrue = truth["theta"], truth["omega"], truth["sweep"], truth["V"]
@@ -179,16 +246,19 @@ def main():
     def truth_at(m):
         return Vtrue[int(np.argmin(np.abs(sweep - m)))]
 
+    kw = dict(truth=args.truth, rungs=args.rungs, use_wandb=not args.no_wandb, git_hash=git_hash)
     results, t0 = {}, time.time()
     for arm in args.arms:
         if arm == "specialist":
             for m in args.rungs:
-                model, p = train(arm, args.steps, m, args.odd_mode, args.seed, args.out, args.device)
+                model, p = train(arm, args.steps, m, args.odd_mode, args.seed, args.out,
+                                 args.device, **kw)
                 V = learned_safe_set(model, th_g, om_g, [m], "oracle", args.device)
                 results[f"specialist_m{m:g}"] = compare(V, truth_at(m), cell)
                 print(f"  specialist m={m:g}: {results[f'specialist_m{m:g}']}")
         else:
-            model, p = train(arm, args.steps, None, args.odd_mode, args.seed, args.out, args.device)
+            model, p = train(arm, args.steps, None, args.odd_mode, args.seed, args.out,
+                             args.device, **kw)
             for m in args.rungs:
                 V = learned_safe_set(model, th_g, om_g, [m],
                                      "blind" if arm == "blind" else "oracle", args.device)
