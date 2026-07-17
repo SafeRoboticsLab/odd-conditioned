@@ -93,6 +93,10 @@ class PendulumODD(gym.Env):
         resample_prob: float = 0.004,      # per step; ~1 ODD change per 250 steps (6.25 s)
         max_steps: int = 400,              # 10 s at dt=0.025
         adversary: bool = True,            # expose the F channel for ISAACS
+        spawn_theta_frac: float = 0.9,     # reset support as a fraction of the failure threshold
+        spawn_omega_frac: float = 0.5,     # E008 used 0.5 -> covered only HALF the scoring grid's
+                                           # omega range, so the boundary at high |omega| was never
+                                           # supervised. Widen toward ~0.98 for the gate.
         seed: Optional[int] = None,
     ) -> None:
         super().__init__()
@@ -105,6 +109,7 @@ class PendulumODD(gym.Env):
         self.mass_range, self.A_range, self.w_range = mass_range, A_range, w_range
         self.resample_prob, self.max_steps = resample_prob, max_steps
         self.adversary = adversary
+        self.spawn_theta_frac, self.spawn_omega_frac = spawn_theta_frac, spawn_omega_frac
         self._rng = np.random.default_rng(seed)
 
         # ISAACS wants ctrl and dstb in one action vector; safety_sb3's Isaacs* classes split it.
@@ -148,11 +153,24 @@ class PendulumODD(gym.Env):
         return M0_SINE + self.A * np.sin(self.phi)
 
     def odd_features(self) -> np.ndarray:
-        """What an oracle policy is told. For sine we expose (A, w_log, phase) -- the phase is
-        part of the STATE, not the ODD; (A, w) are the ODD."""
+        """What an oracle policy is told, NORMALIZED to ~[-1, 1] to match sin/cos/omega scale.
+
+        E008 fed raw `m ∈ [2,8]` (magnitude ~5, ±3 variation) alongside sin/cos ∈ [-1,1] — a
+        near-constant large input a net learns to ignore, a candidate cause of 'conditioned ≈
+        blind'. Normalization is the specific fix. The scorer must call `normalize_mass` with the
+        SAME range so train-time and eval-time features agree.
+        """
         if self.odd_mode == "static":
-            return np.array([self.m_static], dtype=np.float32)
-        return np.array([self.A, np.log10(max(self.w, 1e-6)), self.phi], dtype=np.float32)
+            return np.array([self.normalize_mass(self.m_static)], dtype=np.float32)
+        A_n = 2 * (self.A - self.A_range[0]) / (self.A_range[1] - self.A_range[0] + 1e-9) - 1
+        lo, hi = np.log10(self.w_range[0]), np.log10(self.w_range[1])
+        w_n = 2 * (np.log10(max(self.w, 1e-6)) - lo) / (hi - lo + 1e-9) - 1
+        return np.array([A_n, w_n, self.phi / np.pi - 1], dtype=np.float32)
+
+    def normalize_mass(self, m: float) -> float:
+        """[mass_lo, mass_hi] -> [-1, 1]. Public so the scorer maps eval masses identically."""
+        lo, hi = self.mass_range
+        return 2 * (m - lo) / (hi - lo + 1e-9) - 1
 
     # ------------------------------------------------------------------ margins
 
@@ -215,8 +233,10 @@ class PendulumODD(gym.Env):
         # Spawn anywhere in the safe set. Check margins against the reset distribution's own
         # physics: a margin violated by the spawns themselves condemns that state space by
         # construction.
-        self.theta = float(self._rng.uniform(-0.9 * THETA_MAX, 0.9 * THETA_MAX))
-        self.omega = float(self._rng.uniform(-0.5 * OMEGA_LIM, 0.5 * OMEGA_LIM))
+        self.theta = float(self._rng.uniform(-self.spawn_theta_frac * THETA_MAX,
+                                             self.spawn_theta_frac * THETA_MAX))
+        self.omega = float(self._rng.uniform(-self.spawn_omega_frac * OMEGA_LIM,
+                                             self.spawn_omega_frac * OMEGA_LIM))
         self._hist, self._t = [], 0
         obs = self._obs()
         return obs, {"l_x": self.target_margin(self.theta, self.omega), "mass": self.mass}
