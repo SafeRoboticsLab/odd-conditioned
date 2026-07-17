@@ -234,25 +234,56 @@ def main():
                         ref_worst=worst, ref_mean=mean_m, ref_best=best, M0=M0)
 
     # --- verdict
+    #
+    # An interior argmin is NOT evidence of resonance. On a FLAT curve, grid noise puts the
+    # argmin at a random interior index every time -- an earlier version of this check tested
+    # only `0 < argmin < n-1` and duly reported "RESONANCE" for a curve that varied by 0.87%.
+    # A dip must clear a magnitude threshold AND sit somewhere physically meaningful before it
+    # means anything.
+    RESONANCE_MIN_DEPTH = 0.05        # the dip must be >=5% below BOTH endpoints
     i_min = int(np.argmin(obs_v))
+    spread = float(obs_v.max() - obs_v.min()) / max(obs_v.mean(), 1e-12)
+    depth = min(obs_v[0], obs_v[-1]) and (min(obs_v[0], obs_v[-1]) - obs_v[i_min]) / min(obs_v[0], obs_v[-1])
     interior = 0 < i_min < len(ws) - 1
+    resonance = bool(interior and depth >= RESONANCE_MIN_DEPTH)
+
     print("\n" + "=" * 78)
     print(f"static refs:  best (m={M0-args.A:.0f}) = {best:.4f}   "
           f"mean (m={M0:.0f}) = {mean_m:.4f}   worst (m={M0+args.A:.0f}) = {worst:.4f}")
     print(f"oscillating:  min = {obs_v[i_min]:.4f} at w = {ws[i_min]:.2f} rad/s "
           f"({ws[i_min]/W_NATURAL:.2f} x natural)   max = {obs_v.max():.4f} at w = {ws[int(np.argmax(obs_v))]:.2f}")
-    if interior:
+    print(f"observed spread across the whole sweep: {100*spread:.2f}%   "
+          f"(interior dip depth vs endpoints: {100*depth:.2f}%, need >={100*RESONANCE_MIN_DEPTH:.0f}%)")
+    if resonance:
         print("\n>>> NON-MONOTONE IN FREQUENCY: the safe set is worst at an INTERMEDIATE frequency.")
         print("    RESONANCE IN THE ODD. The frequency axis is non-monotone while the amplitude")
         print("    axis is monotone => the ODD is 'ordered cone x non-monotone nuisance' exactly as")
         print("    proposal 5.5 anticipates. Monotone structure must NOT be imposed on this axis.")
     else:
-        print("\n>>> MONOTONE IN FREQUENCY (min at an endpoint). The resonance prediction FAILS on")
-        print("    this ladder -- record it honestly. Monotone structure may apply to both axes.")
+        print("\n>>> RESONANCE HYPOTHESIS **FAILS**. `observed` is FLAT in frequency "
+              f"({100*spread:.2f}% spread);")
+        print("    the argmin's location is noise, not a dip. Record it honestly: the frequency")
+        print("    axis carries almost no information for a filter that OBSERVES the phase.")
+        print("    This SIMPLIFIES 5.5 (no non-monotone nuisance found on this axis) and moves")
+        print("    the result to the observed-vs-unobserved gap below.")
     if obs_v.max() > worst * 1.02:
         print(f"\n    Oscillation beats the static worst case by up to "
               f"{100*(obs_v.max()/worst - 1):.0f}% -- the temporary-excursion argument holds:")
         print("    a bounded oscillation is a strictly smaller uncertainty class than parking at m_max.")
+        print(f"    It also beats the static MEAN (m={M0:.0f}) by {100*(obs_v.max()/mean_m - 1):.0f}% "
+              f"-- Jensen: control accel is u/(m l^2), so what averages is <1/m> >= 1/<m>.")
+
+    # The actual result: the value of observing the ODD, as a function of how fast it changes.
+    g0, g1 = obs_v[0] - unobs_v[0], obs_v[-1] - unobs_v[-1]
+    print(f"\n    THE FINDING -- gap (observed - unobserved) = the value of seeing the ODD phase:")
+    print(f"      slow (w={ws[0]:.2f}): {g0:.4f}   ->   fast (w={ws[-1]:.1f}): {g1:.4f}   "
+          f"({100*(1-g1/g0):.0f}% collapse)")
+    print(f"      slow-limit check: unobserved={unobs_v[0]:.4f} vs static worst={worst:.4f} "
+          f"(quasi-static => must assume m_max; agreement validates the 3-D solver)")
+    print("      => The FASTER the ODD changes, the LESS it matters that you cannot observe it.")
+    print("         Fast changes average out before the plant can respond; slow ones must be")
+    print("         tracked. This runs OPPOSITE to the intuition that a fast-changing world")
+    print("         demands better estimation -- and it says WHEN ODD estimation is worth building.")
     print("=" * 78)
 
     _plot(grid, ws, obs_v, unobs_v, Vs, args.A, refs, args.out)

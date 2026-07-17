@@ -166,7 +166,7 @@ def _wandb_init(arm, tag, steps, fixed_mass, odd_mode, seed, git_hash):
 
 
 def train(arm, steps, fixed_mass, odd_mode, seed, out_dir, device,
-          truth=None, rungs=(), use_wandb=True, git_hash="unknown"):
+          truth=None, rungs=(), use_wandb=True, git_hash="unknown", eval_freq=None):
     from stable_baselines3.common.vec_env import DummyVecEnv
     from safety_sb3 import IsaacsSAC
 
@@ -198,7 +198,8 @@ def train(arm, steps, fixed_mass, odd_mode, seed, out_dir, device,
         # Return is meaningless here (reward IS the margin, so it only says "did not fall").
         # What we watch is the learned SET vs the grid's, per rung -- collapse and optimism
         # are only visible there.
-        cbs.append(ODDSafeSetEval(truth, rungs, obs_mode, eval_freq=max(steps // 8, 5_000),
+        cbs.append(ODDSafeSetEval(truth, rungs, obs_mode,
+                                  eval_freq=eval_freq or max(steps // 8, 5_000),
                                   use_wandb=use_wandb,
                                   fig_dir=os.path.join(out_dir, f"overlays_{tag}")))
 
@@ -224,6 +225,9 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", default="cpu")   # 2-D obs, tiny nets: CPU beats GPU here
     ap.add_argument("--no-wandb", action="store_true")
+    ap.add_argument("--eval-freq", type=int, default=None,
+                    help="steps between safe-set evals (default: steps//8, min 5k ~ 15 min "
+                         "wall-clock at 40 steps/s). Set small to smoke-test the callback.")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
 
@@ -246,7 +250,8 @@ def main():
     def truth_at(m):
         return Vtrue[int(np.argmin(np.abs(sweep - m)))]
 
-    kw = dict(truth=args.truth, rungs=args.rungs, use_wandb=not args.no_wandb, git_hash=git_hash)
+    kw = dict(truth=args.truth, rungs=args.rungs, use_wandb=not args.no_wandb,
+              git_hash=git_hash, eval_freq=args.eval_freq)
     results, t0 = {}, time.time()
     for arm in args.arms:
         if arm == "specialist":

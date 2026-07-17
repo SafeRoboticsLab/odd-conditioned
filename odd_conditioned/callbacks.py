@@ -86,6 +86,8 @@ class ODDSafeSetEval(BaseCallback):
             self._log_overlay(figs)
         return True
 
+    _warned = False
+
     def _log_overlay(self, figs):
         """The eval-artifact analogue: learned vs true safe set per rung, uploaded to wandb."""
         try:
@@ -93,7 +95,16 @@ class ODDSafeSetEval(BaseCallback):
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
             import wandb
-        except Exception:
+        except Exception as e:
+            # Do NOT fail silently. An earlier version swallowed this, and because the
+            # odd-cond env was cloned from safety_sb3 (which has no matplotlib) the eval
+            # artifact would simply never have appeared -- indistinguishable from "the run is
+            # fine" across a 40-minute run. Warn once, loudly, and keep training.
+            if not ODDSafeSetEval._warned:
+                ODDSafeSetEval._warned = True
+                print(f"!! ODDSafeSetEval: overlay disabled ({type(e).__name__}: {e}). "
+                      f"Scalars still logged. `pip install matplotlib wandb` in this env.",
+                      flush=True)
             return
 
         fig, axes = plt.subplots(1, len(figs), figsize=(3.4 * len(figs), 3.6), squeeze=False)
