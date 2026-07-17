@@ -27,6 +27,14 @@ import json
 import os
 import sys
 
+# CRITICAL: cap torch threads BEFORE importing torch. The env is a 2-D ODE (free); 100% of the
+# cost is SAC gradient steps on tiny [128,128,128] nets. On a 24-core box torch's default
+# all-cores threading THRASHES: measured 3 steps/s at 24 threads vs 102 steps/s at 4 (34x).
+# 4 threads/job × 5 jobs = 20 ≤ 24 cores, so all arms run in parallel in ~50 min, not ~5 days.
+os.environ.setdefault("OMP_NUM_THREADS", os.environ.get("TORCH_THREADS", "4"))
+import torch  # noqa: E402
+torch.set_num_threads(int(os.environ.get("TORCH_THREADS", "4")))
+
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 
@@ -139,8 +147,19 @@ def main():
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--no-wandb", action="store_true")
     ap.add_argument("--score-only", action="store_true", help="skip training, re-score existing zips")
+    ap.add_argument("--arm", help="train exactly ONE arm and exit (for parallel fan-out): "
+                                  "conditioned | blind | specialist")
+    ap.add_argument("--mass", type=float, help="fixed mass for --arm specialist")
+    ap.add_argument("--seed", type=int, help="single seed for --arm mode")
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
+
+    # --- single-arm mode: one training, then exit. The driver fans 5 of these out in parallel.
+    if args.arm:
+        fixed = args.mass if args.arm == "specialist" else None
+        train_one(args.arm, fixed, args.steps, args.seed if args.seed is not None else args.seeds[0],
+                  args.g0, args.g_end, args.spawn_omega_frac, args.out, args.device, not args.no_wandb)
+        return
 
     # the training plan: conditioned + blind + specialists, per seed
     plan = []  # (arm, fixed_mass, seed)
@@ -148,7 +167,8 @@ def main():
         plan += [("conditioned", None, s), ("blind", None, s)]
         plan += [("specialist", m, s) for m in args.specialist_rungs]
     print(f"E008c: {len(plan)} trainings ({args.steps:,} steps each, seeds {args.seeds}), "
-          f"γ {args.g0}→{args.g_end}, spawn_ω_frac {args.spawn_omega_frac}, STATIC ODD")
+          f"γ {args.g0}→{args.g_end}, spawn_ω_frac {args.spawn_omega_frac}, STATIC ODD, "
+          f"{torch.get_num_threads()} torch threads")
 
     zips = {}
     for arm, fixed, s in plan:
