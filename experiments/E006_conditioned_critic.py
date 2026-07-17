@@ -161,6 +161,14 @@ def _wandb_init(arm, tag, steps, fixed_mass, odd_mode, seed, git_hash):
                     seed=seed, git=git_hash, algo="IsaacsSAC", net_arch=[128, 128, 128],
                     lr=5e-4, lr_schedule="STATIC (KL-adaptive is single-player)",
                     ctrl_action_dim=1, margin_mode="avoid (l_neg -> matches E003 avoid truth)"),
+        # WITHOUT THIS, WANDB GETS ONLY THE OVERLAY IMAGE.
+        # The callback reports via self.logger.record(), which is SB3's logger -> tensorboard,
+        # NOT wandb. Only the explicit wandb.log() for the image was reaching the dashboard, so
+        # every scalar that matters (odd/vol_ratio_*, odd/optimism_*, and SB3's own
+        # train/critic_loss -- the DR-divergence signature we are specifically watching for)
+        # was invisible. sync_tensorboard mirrors the whole tb stream into wandb; it requires
+        # tensorboard_log to be set on the model (it is, in train()).
+        sync_tensorboard=True,
         reinit=True, save_code=False,
     )
 
