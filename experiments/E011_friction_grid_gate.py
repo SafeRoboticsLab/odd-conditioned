@@ -29,27 +29,46 @@ import os
 
 import numpy as np
 
-# --- physical constants (SI-ish; arena ~4x3 m, v<=2 m/s) ---------------------------------------
+# --- physical constants (SI-ish; arena ~4x3 m) -------------------------------------------------
 G = 9.8
-V_MAX = 2.0
+V_MIN, V_MAX = 1.6, 2.0     # 🔑 the car CANNOT slow below V_MIN — committed to high speed, so
+                            # friction binds on FEASIBILITY (E011 v1 lesson: with v_min=0 the car
+                            # creeps and friction only affects speed, never the safe SET).
 DT = 0.05
 WHEELBASE, DELTA_LIM = 0.257, 0.35
 KAPPA_MAX = np.tan(DELTA_LIM) / WHEELBASE          # ~1.42 /m  (min turn radius ~0.7 m)
-CAR_HALF = 0.21                                     # inflate obstacles by this (point-car grid)
+CAR_HALF = 0.16
+# Design point: a near-KAPPA_MAX turn at v>=V_MIN needs  v^2*KAPPA_MAX <= mu*G.
+#   mu* = V_MIN^2 * KAPPA_MAX / G = 1.6^2 * 1.42 / 9.8 ≈ 0.37.
+#   => at mu<0.37 the forced sharp turn is INFEASIBLE (collision); at mu>=0.5 it's fine.  THE BIFURCATION.
 
-# --- asymmetric two-gap geometry: near-narrow (upper) gap vs far-wide (lower) detour -----------
-# high mu: thread the tight upper gap (sharp turn, needs grip).  low mu: can't -> wide lower arc.
-GOAL = (3.5, 0.0, 0.35)
-OBSTACLES = np.array([
-    [1.8,  0.00, 0.45],     # central: blocks straight
-    [1.8,  0.95, 0.35],     # upper: with the central one, forms a NARROW upper gap (~0.15 m)
-    [1.8, -1.30, 0.55],     # lower-far: leaves a WIDE but longer lower route
-], dtype=np.float64)
+# --- FORCED-TURN geometry: a committed lane whose ONLY exit to the goal is a near-KAPPA_MAX turn.
+# E011 v2 lesson: as long as ANY mu-independent route to the goal exists, the safe set is
+# mu-invariant. So there must be NO gentle escape — the goal is reachable ONLY through a sharp turn
+# that low mu cannot make at v>=V_MIN. Committed lane (walls both sides) -> straight ends in a
+# barrier (straight = death) -> the sole way out is to turn UP ~90 deg into the goal. A
+# KAPPA_MAX turn at v=V_MIN needs mu>=0.37, so mu<0.37 loses feasibility from the deep-lane states
+# => the safe SET shrinks with mu. (Single gap for now — sensitivity first; the 2nd gap for the
+# mode-flip is the next iteration once friction provably binds.)
+def _wall(y, x0, x1, r=0.30, step=0.30):
+    return [[x, y, r] for x in np.arange(x0, x1 + 1e-9, step)]
+
+GOAL = (2.55, 1.05, 0.34)
+OBSTACLES = np.array(
+    _wall(+0.55, -0.3, 1.5) +                       # top lane wall ENDS at x=1.5 (turn-up opens)
+    _wall(-0.55, -0.3, 2.8) +                       # bottom lane wall — long (no lower escape)
+    [[3.0, 0.0, 0.62], [3.0, 0.6, 0.5]] +           # END BARRIER: straight-ahead = death
+    _wall(+1.75, 1.9, 3.9, r=0.34) +                # ceiling above the goal
+    [[1.55, 1.75, 0.4]],                            # inner corner forces turn ~KAPPA_MAX
+    dtype=np.float64)
+# ONLY exit: from the lane (heading +x at v>=V_MIN) turn UP ~90deg into GOAL@(2.55,1.05). A
+# KAPPA_MAX turn (radius ~0.7 m) needs mu >= V_MIN^2*KAPPA_MAX/G ≈ 0.37; below that it is infeasible
+# from the committed-speed lane states => those states go UNSAFE => safe-set volume shrinks with mu.
 
 
 class Grid4:
     def __init__(self, nx=31, ny=31, npsi=24, nv=12,
-                 xlim=(-0.2, 4.0), ylim=(-1.9, 1.9), vlim=(0.0, V_MAX)):
+                 xlim=(-0.3, 4.1), ylim=(-2.0, 1.9), vlim=(V_MIN, V_MAX)):
         self.x = np.linspace(*xlim, nx)
         self.y = np.linspace(*ylim, ny)
         self.psi = np.linspace(-np.pi, np.pi, npsi, endpoint=False)   # periodic
@@ -123,7 +142,7 @@ def solve(grid, g, l, mu, V_init=None, tol=1e-5, max_iter=400, patience=30):
             xn = grid.X + grid.V * np.cos(grid.PS) * DT
             yn = grid.Y + grid.V * np.sin(grid.PS) * DT
             pn = grid.PS + grid.V * k * DT
-            vn = np.clip(grid.V + a_long * DT, 0.0, V_MAX)
+            vn = np.clip(grid.V + a_long * DT, V_MIN, V_MAX)
             nv = grid.interp(V, xn, yn, pn, vn)
             better = nv > best
             best = np.where(better, nv, best)
