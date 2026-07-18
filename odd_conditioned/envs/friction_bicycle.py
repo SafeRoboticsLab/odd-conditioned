@@ -232,8 +232,14 @@ class FrictionBicycleEnv(gym.Env):
             self._rng = np.random.default_rng(seed)
         self.mu_provider.reset(self._rng)
         if self.randomize:
-            self.s = np.array([self._rng.uniform(-0.4, 2.2), self._rng.uniform(-0.6, 0.6),
-                               self._rng.uniform(-0.6, 0.6), self._rng.uniform(0.0, V_MAX)])
+            # broad spawns over the full grid-covered region + all headings (the critic must match the
+            # grid everywhere); reject in-obstacle spawns so they don't waste immediate-terminate episodes
+            for _ in range(50):
+                s = np.array([self._rng.uniform(-0.4, 3.2), self._rng.uniform(-0.9, 2.7),
+                              self._rng.uniform(-np.pi, np.pi), self._rng.uniform(0.0, V_MAX)])
+                if g_of(s) >= 0.0:
+                    break
+            self.s = s
         else:
             self.s = np.array([0.0, 0.0, 0.0, 2.0])
         self.t = 0; self._hist = np.full(self.hist_len, self._mu_norm(self.mu_range[0]))
