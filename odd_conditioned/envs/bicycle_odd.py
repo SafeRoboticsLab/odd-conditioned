@@ -26,7 +26,12 @@ from odd_conditioned.envs import _bicycle5d_vendored as bk
 class BicycleGoalODD(bk.BicycleGoal):
     def __init__(
         self,
-        c_range: Tuple[float, float] = (0.4, 1.0),   # control-authority multiplier range
+        c_range: Tuple[float, float] = (0.5, 1.5),   # control-authority multiplier range.
+                                                     # INCLUDES c>1 (super-nominal agility): the
+                                                     # regime where an adaptive policy can EXPLOIT
+                                                     # extra authority — where a conservative
+                                                     # one-mode policy 'leaves performance on the
+                                                     # table' most visibly.
         fixed_c: Optional[float] = None,             # pin c (specialist / eval at one ODD)
         resample_prob: float = 0.0,                  # per-step mid-episode ODD change (dynamic ODD)
         expose_odd: bool = False,                    # False = blind (the implicit test); True = oracle

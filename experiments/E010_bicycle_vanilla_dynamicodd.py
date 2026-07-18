@@ -69,29 +69,53 @@ def train(tag, fixed_c, resample_prob, expose_odd, steps, seed, out, device, use
 
 
 def evaluate(zip_path, expose_odd, c_grid, n_ep=60, seed=1000):
-    """Reach & collision rate at each fixed c. Reach = reached goal before timeout w/o collision."""
+    """STRATEGY/EFFECTIVENESS metrics per fixed c — not just safe rate.
+
+    Buzi's point: safe rate is not the differentiator (a blind policy learns one conservative mode
+    that is safe across all c, like DR). The question is whether the learned STRATEGY *adapts* to c
+    (exploits agility when c is high, backs off when low) or is c-INVARIANT. So we measure the
+    policy's EFFECTIVENESS as a function of c, and read the SLOPE:
+      * a c-invariant one-mode policy  -> metrics ~FLAT in c (esp. blind, which cannot see c);
+      * an ODD-adaptive policy         -> metrics track c (faster / tighter / more exploitative
+                                          when c is high).
+    Metrics (over SUCCESSFUL reaches, plus the safe rates for context):
+      reach_time   steps to goal            (adaptive: DOWN as c up — exploits agility)
+      mean_speed   avg v on the path        (adaptive: UP as c up)
+      clearance    min g_x along traj       (adaptive: cuts closer at high c, keeps margin at low c)
+      cmd_accel/omega  mean |commanded u|   (the policy's chosen aggressiveness, BEFORE c scaling —
+                                             a c-invariant policy commands the same u regardless)
+    """
     from safety_sb3 import ReachAvoidSAC
     model = ReachAvoidSAC.load(zip_path, device="cpu")
     out = {}
     for c in c_grid:
         reached = collided = 0
+        rt, spd, clr, ca, co = [], [], [], [], []
         for e in range(n_ep):
             env = BicycleGoalODD(fixed_c=c, resample_prob=0.0, expose_odd=expose_odd,
                                  randomize=True, seed=seed + e)
             obs, _ = env.reset(seed=seed + e)
-            done = False
-            got = hit = False
+            done = got = hit = False
+            t = 0; vs = []; gmin = np.inf; accs = []; oms = []
             while not done:
                 a, _ = model.predict(obs, deterministic=True)
+                a = np.asarray(a).reshape(-1)
+                accs.append(abs(float(a[0]))); oms.append(abs(float(a[1])))
                 obs, g, term, trunc, info = env.step(a)
-                if info.get("collided"):
-                    hit = True
-                if info.get("reached"):
-                    got = True
-                done = term or trunc
-            reached += got and not hit
+                vs.append(float(env.s[2]))            # speed state
+                gmin = min(gmin, g)
+                if info.get("collided"): hit = True
+                if info.get("reached"): got = True
+                t += 1; done = term or trunc
             collided += hit
-        out[f"{c:.2f}"] = dict(reach=reached / n_ep, collide=collided / n_ep)
+            if got and not hit:                       # strategy metrics on CLEAN reaches only
+                reached += 1
+                rt.append(t); spd.append(np.mean(vs)); clr.append(gmin)
+                ca.append(np.mean(accs)); co.append(np.mean(oms))
+        m = lambda a: float(np.mean(a)) if a else float("nan")
+        out[f"{c:.2f}"] = dict(reach=reached / n_ep, collide=collided / n_ep,
+                               reach_time=m(rt), mean_speed=m(spd), clearance=m(clr),
+                               cmd_accel=m(ca), cmd_omega=m(co))
     return out
 
 
@@ -126,7 +150,7 @@ def main():
         "spec_lo":   (0.4,  0.0,   False),   # ceiling at hard c
         "oracle":    (None, 0.0,   True),    # c in the obs (conditioned upper bound)
     }
-    c_grid = [0.4, 0.55, 0.7, 0.85, 1.0]
+    c_grid = [0.5, 0.75, 1.0, 1.25, 1.5]
 
     # single-arm mode: one training, then exit (the driver fans 5 of these out in parallel)
     if args.arm:
@@ -146,34 +170,43 @@ def main():
                       not args.no_wandb, git_hash)
         zips[tag] = (p, eo)
 
-    print("\nEVAL — reach rate (collision rate) at each control-authority c:")
-    print(f"  {'arm':>10} | " + " ".join(f"{c:>12.2f}" for c in c_grid))
-    print("  " + "-" * (13 + 13 * len(c_grid)))
     results = {}
     for tag, (p, eo) in zips.items():
-        r = evaluate(p, eo, c_grid)
-        results[tag] = r
-        cells = " ".join(f"{r[f'{c:.2f}']['reach']:.2f}({r[f'{c:.2f}']['collide']:.2f})"
-                         for c in c_grid)
-        print(f"  {tag:>10} | {cells}")
+        results[tag] = evaluate(p, eo, c_grid)
     json.dump(results, open(os.path.join(args.out, "eval.json"), "w"), indent=2)
 
-    # verdict
+    # --- the STRATEGY question: does effectiveness track c, or is it flat (one conservative mode)?
+    def slope(arm, key):
+        """least-squares slope of metric vs c over the grid — the adaptation signal."""
+        r = results.get(arm, {})
+        xs = [c for c in c_grid if f"{c:.2f}" in r and not np.isnan(r[f"{c:.2f}"][key])]
+        ys = [r[f"{c:.2f}"][key] for c in xs]
+        if len(xs) < 2:
+            return float("nan")
+        return float(np.polyfit(xs, ys, 1)[0])
+
+    metrics = ["reach", "collide", "reach_time", "mean_speed", "clearance", "cmd_accel", "cmd_omega"]
+    for key in metrics:
+        print(f"\n{key} @ c = " + " ".join(f"{c:.2f}" for c in c_grid) + "   [slope vs c]")
+        for tag in results:
+            row = results[tag]
+            cells = " ".join(f"{row[f'{c:.2f}'][key]:5.2f}" for c in c_grid)
+            print(f"  {tag:>10} | {cells}   [{slope(tag, key):+.2f}]")
+
     print("\n" + "=" * 74)
-    bl = results.get("blind", {})
-    sh, sl = results.get("spec_hi", {}), results.get("spec_lo", {})
-    if bl and sh and sl:
-        gap_hi = sh["1.00"]["reach"] - bl["1.00"]["reach"]
-        gap_lo = sl["0.40"]["reach"] - bl["0.40"]["reach"]
-        coll_lo = bl["0.40"]["collide"]
-        print(f"blind vs specialist: reach gap at c=1.0 = {gap_hi:+.2f}, at c=0.4 = {gap_lo:+.2f}; "
-              f"blind collision at c=0.4 = {coll_lo:.2f}")
-        if gap_hi < 0.1 and gap_lo < 0.1 and coll_lo < 0.05:
-            print(">>> VANILLA ALREADY SOLVES IT: blind ~ specialists, low collisions. The dynamic-ODD")
-            print("    problem is implicit-solvable for this task/algo. Re-examine the thesis.")
-        else:
-            print(">>> VANILLA DOES NOT SOLVE IT: blind trails specialists and/or collides at low c.")
-            print("    Conditioning/estimation is motivated. (Predicted.)")
+    print("STRATEGY VERDICT — the question is the SLOPE of effectiveness vs c, not the safe rate.")
+    print("A c-INVARIANT (one conservative mode) policy has ~flat metrics; an ODD-ADAPTIVE policy")
+    print("tracks c (faster / higher-speed / tighter clearance as c rises).")
+    for tag in ("blind", "oracle", "spec_hi"):
+        if tag in results:
+            print(f"  {tag:>10}: speed slope {slope(tag,'mean_speed'):+.2f}, "
+                  f"reach_time slope {slope(tag,'reach_time'):+.2f}, "
+                  f"clearance slope {slope(tag,'clearance'):+.2f}, "
+                  f"cmd_accel slope {slope(tag,'cmd_accel'):+.2f}")
+    print("  Read: blind flat + oracle sloped => conditioning ENABLES strategy adaptation (the point).")
+    print("        blind also sloped         => the realized behaviour adapts via DYNAMICS alone,")
+    print("                                     even though the POLICY map is c-invariant — check")
+    print("                                     cmd_accel/omega slopes (the policy's OWN choice).")
     print("=" * 74)
 
 
