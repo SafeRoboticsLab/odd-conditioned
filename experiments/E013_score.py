@@ -23,11 +23,12 @@ ARMS = {"conditioned": "mu_local", "blind": "blind", "spec_hi": "blind", "spec_l
 
 
 def graded_margins(grid):
-    """g = E011's; l = the env's GRADED l (so the grid truth matches what the critic was trained on)."""
+    """g = E011's; l = the env's GRADED l (so the grid truth matches what the critic was trained on).
+    Uses the env's GOAL_VALUE/L_SCALE constants — keep matched to the p* risk dial in friction_bicycle."""
     g, _ = E.margins(grid)
     d = np.hypot(grid.X - FB.GOAL[0], grid.Y - FB.GOAL[1]); gr = FB.GOAL[2]
-    inside = 0.3 * (gr - d) / gr
-    outside = (gr - d) / 4.0
+    inside = FB.GOAL_VALUE * (gr - d) / gr
+    outside = (gr - d) / FB.L_SCALE
     l = np.clip(np.where(d <= gr, inside, outside), -1.0, 1.0)
     return g, l
 

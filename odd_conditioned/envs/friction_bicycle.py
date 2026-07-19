@@ -34,6 +34,11 @@ KAPPA_MAX = np.tan(DELTA_LIM) / WHEELBASE          # ~1.42 /m
 CAR_HALF = 0.16
 R_GAP = 1.20
 MU_RANGE = (0.1, 1.0)                              # ice -> dry
+# reach/safety margin magnitudes — the p* RISK DIAL (BEST_PRACTICES). g∈[-1,1]; l goal-center value
+# = GOAL_VALUE. GOAL_VALUE=1.0 ⇒ 1:1 reach:safety (p*≈0.5) so the optimizer ATTEMPTS maneuvers; the old
+# 0.3 made reaching worth ≪ avoiding ⇒ safe-loiter optimum (E013b: reach 66%→20% under γ-anneal). V≤g
+# still holds ⇒ raising l does NOT weaken the safety certificate, only the reach incentive.
+GOAL_VALUE, L_SCALE = 1.0, 4.0
 
 # --- geometry (E011 v6.2 "fast-approach dead-end with a tight exit") ---------------------------------
 GOAL = (2.70, 2.45, 0.45)
@@ -87,7 +92,7 @@ def g_of(s: np.ndarray) -> float:
     return float(np.clip(d.min(), -1.0, 1.0))
 
 
-def l_of(s: np.ndarray, goal_value: float = 0.3, l_scale: float = 4.0) -> float:
+def l_of(s: np.ndarray, goal_value: float = GOAL_VALUE, l_scale: float = L_SCALE) -> float:
     """Target margin from distance-to-goal. GRADED outside the goal (piecewise, like the vendored env)
     so the reach gradient survives out to the max spawn distance (~3.6 m) — E011's clip-±1 l would be
     flat -1 at spawn and the policy would never learn to move. NOTE: the E011/E012 GRID used clip-±1 l;
