@@ -20,6 +20,7 @@ import E011_friction_grid_gate as E
 from E013_score import graded_margins, critic_value_on_grid
 
 MUS = [1.0, 0.6, 0.35, 0.2, 0.1]
+DIR = os.environ.get("E013_DIR", "results/E013")
 
 
 def main():
@@ -44,7 +45,7 @@ def main():
         vols = {}
         print(f"  {'μ':>5} | {'peakIoU':>7} {'c*':>5} | {'IoU@c0':>7} | {'RLvol':>7} {'GTvol':>7} (support)")
         for mu in MUS:
-            V = critic_value_on_grid(f"results/E013/{arm}.zip", mode, grid, mu)
+            V = critic_value_on_grid(f"{DIR}/{arm}.zip", mode, grid, mu)
             rl = (V >= 0) & support
             best_iou, best_c = -1, 0.0
             for c in cs:
