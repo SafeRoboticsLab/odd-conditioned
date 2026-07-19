@@ -19,7 +19,23 @@ stiffness→large ⇒ the stack self-rights and moves as one rigid box. So the O
 inject-a-snippet pattern). `sample_scene(...)` wraps N stacks on pedestals into a standalone viewable
 scene. MuJoCo box `size` is HALF-extents; LINC block 0.15×0.15×0.05 → size="0.075 0.075 0.025".
 """
-from typing import List, Tuple
+from typing import List, Optional, Sequence, Tuple
+
+
+def mass_profile(n_blocks: int, total_mass: float, profile: str = "uniform") -> List[float]:
+    """Per-block masses (length n_blocks = 1 fixed base + hinged layers) summing to total_mass.
+    The MASS-DISTRIBUTION ODD axis (shifts payload CoM — top-heavy is far harder to stabilize):
+    'uniform' | 'top_heavy' (linearly ↑ up the stack) | 'bottom_heavy' (linearly ↓)."""
+    if profile == "uniform":
+        w = [1.0] * n_blocks
+    elif profile == "top_heavy":
+        w = [float(i + 1) for i in range(n_blocks)]
+    elif profile == "bottom_heavy":
+        w = [float(n_blocks - i) for i in range(n_blocks)]
+    else:
+        raise ValueError(profile)
+    s = sum(w)
+    return [total_mass * wi / s for wi in w]
 
 HW = 0.075          # box half-width/depth (LINC 0.15 full)
 HH = 0.025          # box half-height     (LINC 0.05 full)
@@ -28,24 +44,27 @@ LAYER_DZ = 2 * HH   # vertical spacing between block frames (block height)
 
 def payload_body(name: str = "payload", pos: Tuple[float, float, float] = (0, 0, 0),
                  n_layers: int = 4, block_mass: float = 2.0,
-                 stiffness: float = 0.0, damping: float = 0.05,
-                 rng: float = 0.5) -> str:
+                 masses: Optional[Sequence[float]] = None,
+                 stiffness: float = 0.0, damping: float = 0.05, rng: float = 0.5) -> str:
     """MJCF <body> for a sloshy stack: block_0 rigidly on the mount, then `n_layers` hinged blocks.
-    Attach under any parent body (the Go2 trunk) at `pos`. stiffness = the RIGIDITY ODD."""
+    Attach under any parent body (the Go2 trunk) at `pos`. ODD axes: n_layers (height/CoM);
+    total mass + DISTRIBUTION via `masses` (length n_layers+1, e.g. from mass_profile) else uniform
+    block_mass; stiffness (RIGIDITY: 0=sloshy…large=rigid); damping."""
+    m = list(masses) if masses is not None else [block_mass] * (n_layers + 1)
+    assert len(m) == n_layers + 1, f"masses must have length n_layers+1={n_layers + 1}, got {len(m)}"
     colors = [".85 .75 .1 1", ".2 .7 .35 1"]                      # LINC alternating Yellow/Green
     lines: List[str] = [f'<body name="{name}_mount" pos="{pos[0]} {pos[1]} {pos[2]}">']
     # block_0 — FIXED to the mount (a geom directly on this body == LINC's fixed body_payload joint)
-    lines.append(f'  <geom name="{name}_b0" type="box" size="{HW} {HW} {HH}" contype="0" conaffinity="0"pos="0 0 {HH}" '
-                 f'mass="{block_mass}" rgba="{colors[0]}"/>')
+    lines.append(f'  <geom name="{name}_b0" type="box" size="{HW} {HW} {HH}" contype="0" conaffinity="0" '
+                 f'pos="0 0 {HH}" mass="{m[0]}" rgba="{colors[0]}"/>')
     indent = "  "
     for i in range(1, n_layers + 1):
         axis = "1 0 0" if i % 2 else "0 1 0"                      # alternate roll/pitch (LINC)
-        col = colors[i % 2]
         lines.append(f'{indent}<body name="{name}_b{i}" pos="0 0 {LAYER_DZ}">')
         lines.append(f'{indent}  <joint name="{name}_j{i}" type="hinge" axis="{axis}" '
                      f'range="{-rng} {rng}" limited="true" stiffness="{stiffness}" damping="{damping}"/>')
-        lines.append(f'{indent}  <geom name="{name}_b{i}" type="box" size="{HW} {HW} {HH}" contype="0" conaffinity="0"'
-                     f'pos="0 0 {HH}" mass="{block_mass}" rgba="{col}"/>')
+        lines.append(f'{indent}  <geom name="{name}_b{i}" type="box" size="{HW} {HW} {HH}" contype="0" '
+                     f'conaffinity="0" pos="0 0 {HH}" mass="{m[i]}" rgba="{colors[i % 2]}"/>')
         indent += "  "
     for i in range(n_layers):                                    # close nested <body> tags
         indent = indent[:-2]
