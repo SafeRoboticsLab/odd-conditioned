@@ -1,0 +1,4 @@
+[submodule "external/robot-safety-sandbox"]
+	path = external/robot-safety-sandbox
+	url = git@github.com:SafeRoboticsLab/robot-safety-sandbox.git
+	branch = main
