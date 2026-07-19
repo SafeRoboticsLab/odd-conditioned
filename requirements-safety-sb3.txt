@@ -1,0 +1,6 @@
+# safety-stable-baselines — consumed as a PINNED git commit (do NOT modify the package).
+# Pinned 2026-07-19 to main@f128330 (post-v0.2.1: adds gamma-annealing 0.99->0.999@20%->0.9999@40%
+# ON by default, entropy min/max_alpha floor, per-agent LRs, SafeSuccessRateEvalCallback — the
+# safe_adaptation_dev recipe). v0.2.1 (last tag) lacked annealing -> flat-gamma undertrained critics.
+# Install: pip install --no-deps "git+https://github.com/SafeRoboticsLab/safety-stable-baselines.git@<commit>"
+git+https://github.com/SafeRoboticsLab/safety-stable-baselines.git@f128330d0f2911ded22844881e5b76af1b62df9f
