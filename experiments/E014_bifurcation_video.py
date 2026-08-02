@@ -7,6 +7,7 @@ import safety_sb3
 from robot_safety_sandbox import make_tensor, spec, algo_name
 from safety_sb3.tensor_env import TensorVecNormalize
 RUNS="results/go2_payload_runs"; DEV="cuda:0"; PULL=th.tensor([0.,1.,0.])
+FR=float(sys.argv[1]) if len(sys.argv)>1 else 0.35
 def render_run(task, steps=200, nenv=2):
     d=f"{RUNS}/{task}_gameplaysac"
     env=make_tensor(task, nenv, DEV, adversary=True, render_mode="rgb_array")
@@ -17,7 +18,7 @@ def render_run(task, steps=200, nenv=2):
                     custom_objects={"_use_lb":False,"_lb_dir":"/tmp/lb","tensorboard_log":None,"buffer_size":1})
     norm=TensorVecNormalize.load(f"{d}/tensornormalize.pt", env); norm.training=False
     dd=spec(task).dstb_dim
-    env.force_scale=0.35*th.ones(nenv,device=DEV)
+    env.force_scale=FR*th.ones(nenv,device=DEV)
     dstb=(PULL/PULL.norm()).to(DEV)[None].expand(nenv,dd).contiguous()
     obs=env.reset(); frames=[]
     for k in range(steps):
@@ -36,7 +37,9 @@ f_light=label(render_run("go2_payload_light_rigid"), "LIGHT+RIGID")
 f_heavy=label(render_run("go2_payload_heavy_sloshy"), "HEAVY+SLOSHY")
 n=min(len(f_light),len(f_heavy)); h=min(f_light[0].shape[0],f_heavy[0].shape[0]); w=min(f_light[0].shape[1],f_heavy[0].shape[1])
 comb=[np.hstack([f_light[i][:h,:w], f_heavy[i][:h,:w]]) for i in range(n)]
-imageio.mimsave("results/go2_payload_runs/bifurcation_dodge_vs_brace.mp4", comb, fps=30, macro_block_size=1)
-print("wrote bifurcation_dodge_vs_brace.mp4  (%d frames, %dx%d)"%(n, comb[0].shape[1], comb[0].shape[0]))
-imageio.imwrite("results/go2_payload_runs/bifurcation_frame.png", comb[n//2])
+os.makedirs("results/E014", exist_ok=True)
+OUTMP4="results/E014/bifurcation_dodge_vs_brace_f%02d.mp4"%int(FR*100)
+imageio.mimsave(OUTMP4, comb, fps=30, macro_block_size=1)
+print("wrote %s  (%d frames, %dx%d) force=%.2f"%(OUTMP4, n, comb[0].shape[1], comb[0].shape[0], FR))
+imageio.imwrite("results/E014/bifurcation_frame_f%02d.png"%int(FR*100), comb[n//2])
 print("wrote mid frame")
