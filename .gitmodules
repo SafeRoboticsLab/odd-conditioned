@@ -2,3 +2,6 @@
 	path = external/robot-safety-sandbox
 	url = git@github.com:SafeRoboticsLab/robot-safety-sandbox.git
 	branch = main
+[submodule "external/safety-stable-baselines"]
+	path = external/safety-stable-baselines
+	url = git@github.com:SafeRoboticsLab/safety-stable-baselines.git
