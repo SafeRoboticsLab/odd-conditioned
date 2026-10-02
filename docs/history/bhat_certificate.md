@@ -1,3 +1,5 @@
+> **Historical (2026-07-21).** Written when the project's contribution was framed as the B̂ detection certificate. The project later moved to specification-level conditioning (docs/FINDINGS.md); B̂ remains the intended trigger/detection layer. Numbers here predate the safety_sb3 0.4.0 soundness fix.
+
 # B̂ as a Certificate: Deductive OOD Detection for the ODD-Conditioned Safety Filter
 
 *Result consolidation, 2026-07-21. Testbed: Go2 quadruped carrying a hidden sloshy/rigid payload; ODD θ = (rigidity ∈ [0,300], total mass ∈ [1.2,7.5] kg).*

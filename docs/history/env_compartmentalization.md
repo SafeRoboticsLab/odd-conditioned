@@ -1,3 +1,5 @@
+> **Historical (2026-08-02).** Describes the shared-conda + per-project `.venv` overlay on the original workstation. `activate.sh` implements it; a fresh install only needs docs/INSTALL.md.
+
 # Compartmentalizing odd-conditioned's Python environment
 
 *Plan + setup, 2026-08-02. Follows the vault guide

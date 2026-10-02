@@ -1,3 +1,5 @@
+> **Historical (2026-08-02).** The migration this plan describes was carried out; the repo now runs on safety_sb3 / robot-safety-sandbox 0.4.0. Kept for the reasoning behind the soundness reset.
+
 # Migration to safety_sb3 0.4.0 + robot-safety-sandbox 0.4.0
 
 *Analysis + plan, 2026-08-02. Status: PROPOSED (nothing migrated yet).*
