@@ -5,7 +5,7 @@ Every number in the paper draft (`reference/PAPER-draft/REPORT.md`) maps to one 
 `bash scripts/fetch_bundles.sh --reference`, `pytest -q tests/`.
 
 ```bash
-bash scripts/reproduce.sh e092 e091 standing figures      # the core of the paper, ~45 min
+bash scripts/reproduce.sh e092 e091 standing figures      # the core of the paper, ~40 min
 ```
 
 Outputs go to `repro/<E0XX-slug>/` (override with `ODD_ARTIFACTS`), logs to `repro/logs/`. The
@@ -30,7 +30,7 @@ reference outputs to compare against are in `reference/<E0XX-slug>/`. Runtimes a
 ## 1. Payload-swap walking — E092 (paper §3, the main walking result)
 
 ```bash
-bash scripts/reproduce.sh e092            # ~10 min  -> repro/E092-payload-walk/
+bash scripts/reproduce.sh e092            # ~6 min  -> repro/E092-payload-walk/
 ```
 
 Walk 12 m; at t=5 s a tall crate (220 N, CoM 0.35 m) is loaded for 8 s, then removed; 40 s horizon; death
@@ -49,8 +49,9 @@ Expected (success / safe, mean ± sd over 4 reps; ± omitted where sd ≤ 0.01):
 | **V2 (ODD-conditioned)** | 0.03±.01 / 0.03±.01 | **0.38±.02 / 0.39±.02** | **0.40±.02 / 0.40±.02** |
 
 What must reproduce: the structural anchors exactly (REST-ONLY 1.00, WALK-ONLY 0.00, ONE-WAY success 0);
-V2 ≈ ONE-WAY safety on the ramps with ~0.4 success instead of 0; V2 > V1 on `dip` on both axes; every
-walking arm ≈ 0 on `pulse` (the maneuver-latency boundary — an instant 220 N load flips a mid-stride robot
+V2 ≈ ONE-WAY safety on the ramps with ~0.4 success instead of 0; on `dip`, V2's success above V1's (by 0.07 on
+average; the safety gap is smaller, 0.04 on average, and can vanish in a single run); on `period` V1 and V2 tie
+(either can come out ahead in a single run); every walking arm ≈ 0 on `pulse` (the maneuver-latency boundary — an instant 220 N load flips a mid-stride robot
 in ~0.3 s, faster than detect + brake + descend). Also produced: `claims_{pulse,period,dip}.png`
 (survival + success-CDF), `topdown_*.png`, `traj_*.npz`. Deaths by automaton state are printed; on the
 ramps most V2 deaths are in BRAKE (~45 %, the walk→stand handoff).
@@ -199,3 +200,21 @@ chains and wall-clock times are in [TRAINING.md](TRAINING.md). A single policy t
 Retrained policies will not reproduce the checkpoints byte-for-byte (GPU nondeterminism), and the runtime
 thresholds in [SWITCHING_LOGIC.md](SWITCHING_LOGIC.md) were calibrated on these particular value nets —
 recalibrate them (E089 `--cal`, E091 `--cal`) after retraining.
+
+---
+
+## Verification record
+
+2026-10-02, fresh clone of the `cleanup` branch (submodules at the pinned commits, weights from the bundle,
+the pinned `mjlab` env), RTX 4070 shared with another job:
+
+| check | result |
+|---|---|
+| `pytest -q tests/` | 12 passed, 1 skipped (the E011 parity test needs grid data that is not bundled) |
+| `e091` (98 s) | WALK-ONLY 0.17/0.17 · REST-ONLY 0.00/1.00 · ONE-WAY 0.06/0.26 · V1 0.18/0.22 · **V2-REUSE 0.27/0.27** |
+| `e092` (351 s) pulse | WALK-ONLY 0/0 · REST-ONLY 0/1.00 · ONE-WAY 0/0.02 · V1 0.02/0.02 · V2 0.02/0.02 |
+| `e092` period | WALK-ONLY 0/0 · REST-ONLY 0/1.00 · ONE-WAY 0/0.41 · V1 0.38/0.38 · V2 0.35/0.36 |
+| `e092` dip | WALK-ONLY 0/0 · REST-ONLY 0/1.00 · ONE-WAY 0/0.41 · V1 0.32/0.37 · **V2 0.37/0.37** |
+| `figures` (11 s) | F2/F3/F7 regenerated from data; claims/top-down rebuilt from the fresh E092 run |
+
+All within ±0.04 of the reference. Peak GPU memory of an N=256 evaluation: ~0.6 GB.

@@ -90,7 +90,7 @@ matches its published checksum and loads, the walker loads, and that short rollo
 
 ```bash
 bash scripts/reproduce.sh e091     # leg-fault walking, ~2 min
-bash scripts/reproduce.sh e092     # payload-swap walking (the paper's main walking table), ~10 min
+bash scripts/reproduce.sh e092     # payload-swap walking (the paper's main walking table), ~6 min
 ```
 
 Outputs go to `repro/` (override with `ODD_ARTIFACTS=<dir>`); compare with `reference/`. What to expect

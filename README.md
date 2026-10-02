@@ -29,7 +29,7 @@ pip install -r requirements.txt
 source activate.sh                          # every session; prints "resolution : OK"
 bash scripts/fetch_bundles.sh --reference   # trained checkpoints -> results/, reference outputs -> reference/
 pytest -q tests/                            # smoke suite, ~35 s
-bash scripts/reproduce.sh e092              # the walking table above, ~10 min -> repro/E092-payload-walk/
+bash scripts/reproduce.sh e092              # the walking table above, ~6 min -> repro/E092-payload-walk/
 ```
 
 ## Documentation

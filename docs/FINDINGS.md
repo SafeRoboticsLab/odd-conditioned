@@ -84,8 +84,9 @@ is unreachable before it arrives, so success = resuming.
 | **ODD-conditioned** | 0.03 / 0.03 | **0.38±.02 / 0.39±.02** | **0.40±.02 / 0.40±.02** |
 
 The full system keeps ONE-WAY's safety on ramps while turning 0 % success into ~40 %. On the honest ramp the
-direct ablation ties it; the deceptive dip breaks the tie on both axes (the blind return stands into the
-returning crate). **The pulse is a boundary, not a detection failure**: an instantly applied 220 N tall load
+direct ablation ties it; the deceptive dip separates them — +0.07 success, +0.04 safety on average over 4 reps
+(the blind
+return stands into the returning crate). **The pulse is a boundary, not a detection failure**: an instantly applied 220 N tall load
 flips a mid-stride robot in ~0.3 s, faster than any detect + brake + descend (~2.5 s). Reactive filtering needs
 the ODD to change slower than the maneuver; faster changes need forecasting.
 

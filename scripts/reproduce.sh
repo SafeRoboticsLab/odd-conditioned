@@ -2,7 +2,7 @@
 # Reproduce the paper-draft results.   bash scripts/reproduce.sh <target> [<target> ...]
 #
 #   smoke       pytest smoke suite (env, checkpoints, short rollouts)                      ~1 min
-#   e092        payload-swap walking: pulse / period / dip x 5 arms  (paper Sec. 3)        ~10 min
+#   e092        payload-swap walking: pulse / period / dip x 5 arms  (paper Sec. 3)        ~6 min
 #   e091        leg-fault walking: FR-leg derate -> heal x 5 arms    (paper Sec. 6)        ~2 min
 #   e089        weight-excursion walking with the naive walker (boundary finding)          ~15 min
 #   standing    E084 load waves + E086 single excursions (+ videos)  (paper Sec. 4)        ~30 min
