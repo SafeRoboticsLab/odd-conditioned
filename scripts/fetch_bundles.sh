@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Fetch + verify + install the trained checkpoints (and, optionally, the reference outputs).
+# Install + verify the trained checkpoints.
 #
-#   bash scripts/fetch_bundles.sh                 # download weights from the GitHub release, verify, extract
-#   bash scripts/fetch_bundles.sh --reference     # ... plus the reference outputs -> reference/
-#   bash scripts/fetch_bundles.sh --from DIR      # use archives already on disk (scp / shared drive) instead
+#   bash scripts/fetch_bundles.sh --from DIR      # DIR holds odd-conditioned-weights-v1.tar.gz (sent to you)
+#   bash scripts/fetch_bundles.sh                 # download it from a GitHub release instead, if one exists
+#   ... --reference                               # maintainer only: also the reference outputs -> reference/
 #
 # Weights land at their recorded repo-relative paths (results/<family>/<run>/checkpoints/...), which is
 # exactly where the experiment scripts look. Every extracted file is checked against
@@ -19,7 +19,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --from) FROM="$(cd "$2" && pwd)"; shift 2 ;;
     --reference) WANT_REF=1; shift ;;
-    -h|--help) sed -n 2,10p "$0"; exit 0 ;;
+    -h|--help) sed -n 2,9p "$0"; exit 0 ;;
     *) echo "unknown arg $1" >&2; exit 2 ;;
   esac
 done
@@ -34,10 +34,15 @@ get() {   # get <archive name> -> dist/<name>
   if [ -f "dist/$name" ]; then return 0; fi
   if [ -n "$FROM" ]; then
     cp "$FROM/$name" "dist/$name"
-  elif command -v gh >/dev/null 2>&1; then
-    gh release download "$RELEASE" -R "$GH_REPO" -p "$name" -D dist
+  elif command -v gh >/dev/null 2>&1 && gh release download "$RELEASE" -R "$GH_REPO" -p "$name" -D dist 2>/dev/null; then
+    :
+  elif curl -fsL -o "dist/$name" "https://github.com/$GH_REPO/releases/download/$RELEASE/$name"; then
+    :
   else
-    curl -fL -o "dist/$name" "https://github.com/$GH_REPO/releases/download/$RELEASE/$name"
+    rm -f "dist/$name"
+    echo "[fetch] $name is not published for download. Get the archive from the maintainer and run:" >&2
+    echo "        bash scripts/fetch_bundles.sh --from <directory containing $name>" >&2
+    exit 1
   fi
 }
 

@@ -56,24 +56,21 @@ sets `MUJOCO_GL=egl`, `cd`s to the repo root, and prints where each package reso
 Run every experiment script **from the repo root** (`python experiments/E092_payload_walk.py`):
 checkpoint paths and submodule imports are repo-root relative, and the scripts refuse to start elsewhere.
 
-## 4. Trained checkpoints and reference outputs
+## 4. Trained checkpoints
 
-Checkpoints are not in git. Fetch them (download → sha256-verify against `weights/MANIFEST.sha256` →
-extract at the recorded paths under `results/`):
+Checkpoints are not in git. You get one archive, `odd-conditioned-weights-v1.tar.gz` (228 MB), from Buzi.
+Put it in any directory and install it:
 
 ```bash
-bash scripts/fetch_bundles.sh --reference
+bash scripts/fetch_bundles.sh --from <directory containing the archive>
 ```
 
-- `odd-conditioned-weights-v1.tar.gz` (~230 MB): the 16 reach-avoid PPO twins the experiments load, plus
-  the two warm-start sources needed to retrain. Lands in `results/<family>/<run>/...`.
-- `odd-conditioned-reference-v1.tar.gz` (~95 MB, optional): the reference outputs — every `results.json`,
-  trajectory `.npz`, figure, video, per-experiment `REPORT.md`, and the paper-draft package
-  (`reference/PAPER-draft/REPORT.md`). Lands in `reference/`.
-
-By default the script downloads from this repository's GitHub release `bundles-v1`. If you received the
-archives another way, point at the directory holding them: `bash scripts/fetch_bundles.sh --from <dir>
---reference`.
+This extracts the 16 reach-avoid PPO twins the experiments load (17.5 MB each) plus the two warm-start
+sources needed to retrain, at their recorded paths under `results/<family>/<run>/...`, and checks every file
+against `weights/MANIFEST.sha256`. Only four of them drive the paper's automaton (see
+[TRAINING.md §2](TRAINING.md#2-the-16-policies)); the rest are needed by the certificate and demo
+experiments. Without the archive you can retrain everything ([TRAINING.md](TRAINING.md)), but the numbers
+will differ and the switching thresholds need recalibrating.
 
 ## 5. Verify
 
@@ -93,8 +90,8 @@ bash scripts/reproduce.sh e091     # leg-fault walking, ~2 min
 bash scripts/reproduce.sh e092     # payload-swap walking (the paper's main walking table), ~6 min
 ```
 
-Outputs go to `repro/` (override with `ODD_ARTIFACTS=<dir>`); compare with `reference/`. What to expect
-and every other target: [REPRODUCE.md](REPRODUCE.md).
+Outputs go to `repro/` (override with `ODD_ARTIFACTS=<dir>`). The expected numbers for every target are in
+[REPRODUCE.md](REPRODUCE.md).
 
 ## Troubleshooting
 
@@ -122,6 +119,5 @@ weights/MANIFEST.sha256     checksums of every checkpoint file in the weights bu
 external/                   the three pinned submodules
 docs/                       this documentation; docs/history/ = superseded write-ups
 results/   (git-ignored)    checkpoints (from the bundle) and training logs
-reference/ (git-ignored)    reference outputs (from the bundle)
 repro/     (git-ignored)    your reproductions (scripts/reproduce.sh)
 ```

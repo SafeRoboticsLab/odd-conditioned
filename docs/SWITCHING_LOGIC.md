@@ -158,7 +158,7 @@ funnel (V2-REUSE keeps V1's rest_hi descent, isolating the return):
 | descent maneuver | rest_hi | dedicated descend_v4 funnel (V2) or rest_hi (V2-REUSE) |
 
 What each piece buys (evidence; standing numbers are survival over N=256, corrected accounting —
-`reference/E084-automaton/results*.json`; E094 means are over 4 reps):
+single runs of E084/E086; E094 means are over 4 reps):
 
 - **The certified return bridge** (get-up funnel + `V_up` + belief gate + abort). Compare V1 with
   V2-REUSE, which descend the same way (rest_hi) and differ only in the return: single benign/period

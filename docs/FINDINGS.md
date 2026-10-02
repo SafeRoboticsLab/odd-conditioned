@@ -1,7 +1,7 @@
 # Findings
 
-What this project established, as of the paper draft v3 (2026-08-24). The draft itself, with detailed figure
-walkthroughs, is `reference/PAPER-draft/REPORT.md` (after `scripts/fetch_bundles.sh --reference`).
+What this project established, as of the paper draft v3 (2026-08-24; the draft itself is not in the repo — this
+page summarizes it, and `scripts/reproduce.sh figures` regenerates its figures).
 Experiment IDs (E0XX) point to `experiments/E0XX_*.py` and [EXPERIMENTS.md](EXPERIMENTS.md).
 
 ## 1. The claim

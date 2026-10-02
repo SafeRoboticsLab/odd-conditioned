@@ -7,15 +7,16 @@
 #   e089        weight-excursion walking with the naive walker (boundary finding)          ~15 min
 #   standing    E084 load waves + E086 single excursions (+ videos)  (paper Sec. 4)        ~30 min
 #   seeds       E094: 3 more reps of e092/waves/single, then mean+-sd (needs e092+standing) ~1.5 h
-#   figures     regenerate F2/F3/F7 + walking/standing figures from data (E093)            ~1 min
+#   figures     regenerate F2/F3/F7 + walking/standing figures from data (E093) — needs the
+#               outputs of `certificates e092 standing` first                              ~1 min
 #   compound    the leg-death-while-loaded demo (E078: matrix, value, ramp, video) (Sec. 5) ~20 min
 #   certificates  the value sweeps behind F2/F7/F3 (E079, E074, E075, E076, E078 value)    ~30 min
 #   videos      E092 + E091 demo videos (rendered, slow)                                    ~20 min
 #
 # Outputs go to $ODD_ARTIFACTS (default: <repo>/repro — NOT ~/artifacts, so a reproduction never
-# overwrites the reference outputs). Logs: $ODD_ARTIFACTS/logs/<target>.log.
-# `figures` with no simulation data of its own first copies reference/ (scripts/fetch_bundles.sh
-# --reference) into $ODD_ARTIFACTS without clobbering, so it works straight after a fetch.
+# overwrites the maintainer's reference outputs). Logs: $ODD_ARTIFACTS/logs/<target>.log.
+# If a reference/ directory exists (maintainer-only bundle), `figures` first copies it into $ODD_ARTIFACTS
+# without clobbering, so it can re-plot without simulating.
 # Runtimes are for one RTX 4070 (12 GB).
 set -euo pipefail
 
@@ -34,12 +35,28 @@ run() {   # run <log name> <python args...>
   python "$@" 2>&1 | grep --line-buffered -v -i 'warn' | tee -a "$ODD_ARTIFACTS/logs/$name.log"
 }
 
-seed_reference() {   # copy reference data in without overwriting anything this reproduction made
+seed_reference() {   # copy reference data in (if present) without overwriting anything this reproduction made
   if [ -d "$REPO/reference" ]; then
     cp -rn "$REPO/reference/." "$ODD_ARTIFACTS/"
-  else
-    echo "[repro] no reference/ — run: bash scripts/fetch_bundles.sh --reference" >&2
   fi
+}
+
+check_figure_inputs() {   # E093 re-plots from data: say which target produces anything missing
+  local missing=0 f
+  declare -A from=(
+    [E077-figures/F2_grid.json]=certificates [E074-hicom-demo/task2_value.json]=certificates
+    [E074-hicom-demo/task3_ramp.json]=certificates [E075-recal-eval/partA_value.json]=certificates
+    [E076-leg-demo/partB_value.json]=certificates [E078-compound-demo/task2_value.json]=certificates
+    [E092-payload-walk/results.json]=e092 [E092-payload-walk/traj_dip.npz]=e092
+    [E084-automaton/results.json]=standing [E084-automaton/results_single.json]=standing
+  )
+  for f in "${!from[@]}"; do
+    if [ ! -f "$ODD_ARTIFACTS/$f" ]; then
+      echo "[repro] figures needs $f — run: bash scripts/reproduce.sh ${from[$f]}" >&2
+      missing=1
+    fi
+  done
+  return $missing
 }
 
 [ $# -gt 0 ] || { sed -n 2,22p "$0"; exit 1; }
@@ -58,6 +75,7 @@ for target in "$@"; do
               done
               run e094_aggregate experiments/E094_seeds.py --aggregate ;;
     figures)  seed_reference
+              check_figure_inputs || exit 1
               run e093 experiments/E093_figpolish.py ;;
     compound) run e078_matrix experiments/E078_matrix.py
               run e078_value experiments/E078_value.py

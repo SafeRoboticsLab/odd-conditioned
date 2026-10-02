@@ -1,21 +1,21 @@
 # Reproducing the results
 
-Every number in the paper draft (`reference/PAPER-draft/REPORT.md`) maps to one target of
-`scripts/reproduce.sh`. Set up first ([INSTALL.md](INSTALL.md)): environment, `source activate.sh`,
-`bash scripts/fetch_bundles.sh --reference`, `pytest -q tests/`.
+Every number in the paper draft maps to one target of `scripts/reproduce.sh`. Set up first
+([INSTALL.md](INSTALL.md)): environment, `source activate.sh`, checkpoints installed with
+`scripts/fetch_bundles.sh --from <dir>`, `pytest -q tests/`.
 
 ```bash
-bash scripts/reproduce.sh e092 e091 standing figures      # the core of the paper, ~40 min
+bash scripts/reproduce.sh e092 e091 standing certificates figures   # the core of the paper, ~1.2 h
 ```
 
-Outputs go to `repro/<E0XX-slug>/` (override with `ODD_ARTIFACTS`), logs to `repro/logs/`. The
-reference outputs to compare against are in `reference/<E0XX-slug>/`. Runtimes are for one RTX 4070.
+Outputs go to `repro/<E0XX-slug>/` (override with `ODD_ARTIFACTS`), logs to `repro/logs/`. Compare them
+with the expected tables below. Runtimes are for one RTX 4070.
 
 ## How to read "expected"
 
 - **No evaluation run is seeded.** A rerun draws fresh spawns, disturbances and gait phases. Expect each
   rate to land within about ±0.04 of the reference at N=256 (the binomial standard error is ≈0.03; the
-  measured run-to-run sd over 4 reps is ≤0.04, `reference/PAPER-draft/seeds/seeds_summary.md`).
+  measured run-to-run sd over 4 reps is ≤0.04).
 - **Every policy was trained once, with seed 0.** "4 reps" in the paper means 4 independent *evaluation*
   repetitions of the same policies, not 4 trained seeds.
 - Rates are fractions of the original N=256 fleet. **safe** = never hit a death condition over the
@@ -68,7 +68,7 @@ ground contact above 500 N).
 The descent trigger is the torque-saturation residual (the value is blind to this fault); the return gate
 is the leg-healthy belief + `V_up`.
 
-Expected (success / safe, single reference run, `reference/E091-leg-walk/results.json`):
+Expected (success / safe, the single reference run):
 
 | WALK-ONLY | REST-ONLY | ONE-WAY | V1 (direct) | V2-REUSE (ODD-conditioned) |
 |---|---|---|---|---|
@@ -90,9 +90,8 @@ disturbance conditions. **This is a negative result:** every walking arm ends at
 success ≤ 0.02 in every condition (REST-ONLY 1.00). Walking under this weight excursion is infeasible for
 the naive walker, and settling under peak load from a gait flips robots. This is why the walking
 demonstration moved to E092 (W=0 light phase, belief trigger, brake handoff, dedicated descent funnel).
-Note: `reference/E089-goal-walk/REPORT.md` describes the earlier 9 m-goal protocol, whose positive-looking
-numbers came from robots finishing before the load arrived; the `results.json` next to it is the 12 m
-protocol this script reproduces.
+(An earlier 9 m-goal version of this protocol looked positive only because robots finished before the load
+arrived; this script runs the 12 m protocol.)
 
 ## 4. Standing automaton under load — E084 + E086 (paper §4)
 
@@ -131,18 +130,18 @@ bash scripts/reproduce.sh e092 standing seeds     # seeds alone ~1.5 h; needs th
 ```
 
 Runs 3 more repetitions of the E092, E084-waves and E086-single tables and aggregates mean ± sd with the
-first run as rep0 → `repro/PAPER-draft/seeds/seeds_summary.md`. Compare with
-`reference/PAPER-draft/seeds/seeds_summary.md`.
+first run as rep0 → `repro/PAPER-draft/seeds/seeds_summary.md`. Compare with the mean ± sd tables of §1
+and §4.
 
 ## 6. Figures — E093 (paper F2, F3, F7, claims, top-downs, survival)
 
 ```bash
-bash scripts/reproduce.sh figures         # ~1 min, from data -> repro/E077-figures/, repro/PAPER-draft/figs/
+bash scripts/reproduce.sh certificates e092 standing   # produce the data first (see §1, §4, §7)
+bash scripts/reproduce.sh figures                      # ~1 min -> repro/E077-figures/, repro/PAPER-draft/figs/
 ```
 
-Regenerates the polished figures from on-disk data. Anything your own runs have produced in `repro/` is
-used; everything else is copied in from `reference/` first (never overwriting your outputs). So
-`figures` right after a fetch re-plots the reference data; after `e092 standing` it plots yours.
+Re-plots the polished figures from on-disk data; it does not simulate. If an input is missing, the runner
+names the target that produces it.
 
 | figure | data it reads | produced by |
 |---|---|---|
@@ -153,8 +152,8 @@ used; everything else is copied in from `reference/` first (never overwriting yo
 | survival (standing) | `E084-automaton/results.json`, `results_single.json` | `standing` |
 | compound timeline + demo video | — (renders its own rollout) | E078_video (`compound`) |
 
-F1, F4, F5, F6, F8 (in `reference/PAPER-draft/figs/`, from the v2 draft) have **no producing script in
-the repo**; they were made ad hoc on 2026-08-22 and are not used by the v3 draft.
+Figures F1, F4, F5, F6, F8 of an earlier draft (v2) have **no producing script in the repo**; they were made
+ad hoc on 2026-08-22 and are not used by the current draft.
 
 ## 7. Certificate evidence — the value sweeps behind F2 / F3 / F7 (paper §1)
 
@@ -215,6 +214,6 @@ the pinned `mjlab` env), RTX 4070 shared with another job:
 | `e092` (351 s) pulse | WALK-ONLY 0/0 · REST-ONLY 0/1.00 · ONE-WAY 0/0.02 · V1 0.02/0.02 · V2 0.02/0.02 |
 | `e092` period | WALK-ONLY 0/0 · REST-ONLY 0/1.00 · ONE-WAY 0/0.41 · V1 0.38/0.38 · V2 0.35/0.36 |
 | `e092` dip | WALK-ONLY 0/0 · REST-ONLY 0/1.00 · ONE-WAY 0/0.41 · V1 0.32/0.37 · **V2 0.37/0.37** |
-| `figures` (11 s) | F2/F3/F7 regenerated from data; claims/top-down rebuilt from the fresh E092 run |
+| `figures` (11 s) | F2/F3/F7 regenerated from data (certificate sweeps taken from the maintainer's runs); claims/top-down rebuilt from the fresh E092 run |
 
 All within ±0.04 of the reference. Peak GPU memory of an N=256 evaluation: ~0.6 GB.

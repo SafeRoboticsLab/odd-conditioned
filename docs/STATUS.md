@@ -9,7 +9,7 @@ collaboration on 2026-10-02. Keep this page current: it is the entry point for a
   certified transitions ([FINDINGS.md](FINDINGS.md)). Policy-level θ-conditioning was tested at length and
   rejected (E043, E055, E060 → E064, E066–E068).
 - **All paper experiments are done**, including 4 evaluation repetitions of the headline tables (E094).
-- **Paper draft v3** exists (`reference/PAPER-draft/REPORT.md`, written 2026-08-24, figures signed off). It
+- **Paper draft v3** exists (with Buzi, not in the repo; written 2026-08-24, figures signed off). It
   is a results package with figure walkthroughs, not yet a manuscript: no venue chosen, no related-work or
   method sections in paper form. An older prose draft (v2, built on E069–E079) also exists outside the repo.
 - **Reproducibility**: everything in the draft regenerates from this repo + the weights bundle
@@ -49,8 +49,8 @@ collaboration on 2026-10-02. Keep this page current: it is the entry point for a
 | what | where |
 |---|---|
 | code | this repo; the project's env/task code is in the sandbox submodule on branch `project/odd-conditioned-go2-payload` |
-| checkpoints | GitHub release `bundles-v1` → `results/` via `scripts/fetch_bundles.sh` |
-| reference outputs + paper draft | same release → `reference/` (`--reference`) |
+| checkpoints | `odd-conditioned-weights-v1.tar.gz` from Buzi → `results/` via `scripts/fetch_bundles.sh --from <dir>` |
+| paper draft, per-experiment reports, videos | with Buzi (not shared); the docs here are the current summary |
 | training logs / wandb | wandb project `odd-conditioned` (entity `buzinguyen`); run ids per policy in [TRAINING.md](TRAINING.md) |
 | experiment-by-experiment history | [EXPERIMENTS.md](EXPERIMENTS.md); the full private lab notebook stays with Buzi |
 

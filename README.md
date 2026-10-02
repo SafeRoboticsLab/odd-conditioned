@@ -27,7 +27,7 @@ conda create -y -n mjlab python=3.11 && conda activate mjlab
 pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
 pip install -r requirements.txt
 source activate.sh                          # every session; prints "resolution : OK"
-bash scripts/fetch_bundles.sh --reference   # trained checkpoints -> results/, reference outputs -> reference/
+bash scripts/fetch_bundles.sh --from <dir>  # the checkpoint archive you were sent -> results/ (verified)
 pytest -q tests/                            # smoke suite, ~35 s
 bash scripts/reproduce.sh e092              # the walking table above, ~6 min -> repro/E092-payload-walk/
 ```
