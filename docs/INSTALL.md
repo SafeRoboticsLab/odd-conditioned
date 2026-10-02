@@ -69,8 +69,9 @@ This extracts the 16 reach-avoid PPO twins the experiments load (17.5 MB each) p
 sources needed to retrain, at their recorded paths under `results/<family>/<run>/...`, and checks every file
 against `weights/MANIFEST.sha256`. Only four of them drive the paper's automaton (see
 [TRAINING.md §2](TRAINING.md#2-the-16-policies)); the rest are needed by the certificate and demo
-experiments. Without the archive you can retrain everything ([TRAINING.md](TRAINING.md)), but the numbers
-will differ and the switching thresholds need recalibrating.
+experiments. Without the archive, train them yourself: `bash scripts/train_all.sh core` (~2 h) and
+`certificates` (~4 h), then recalibrate the switching thresholds — see [TRAINING.md](TRAINING.md). The numbers
+will differ somewhat from the shipped ones.
 
 ## 5. Verify
 

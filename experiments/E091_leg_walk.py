@@ -33,7 +33,7 @@ import numpy as np
 from robot_safety_sandbox import make_tensor, spec
 from robot_safety_sandbox.eval.policies import load_twin
 from robot_safety_sandbox.envs.go2_broken_leg.env_cfg import _ensure_fr_cache
-from E084_automaton import (CK, load_twins, value_of, in_rest_target, in_stance_target,
+from E084_automaton import (CK, load_twins, cal_summary, value_of, in_rest_target, in_stance_target,
                             EPS_UP, K_UP, EPS_ABORT, K_ABORT, REFRACT, ALPHA, K_DN, WARMUP)
 import E089_goal_walk as G
 
@@ -81,7 +81,9 @@ def make_residual(inner):
     return residual
 
 
-def rollout(cond, arm, n=N, cal=False, record=False, render=False):
+def rollout(cond, arm, n=N, cal=False, record=False, render=False, cal_up=False):
+    """cal=True: residual-detector calibration trace. cal_up=True (arm V2-REUSE): return disabled; collects EMA
+    V_up on settled-rest robots once the leg reads healthy — the population the return gate sees (EPS_UP_LEG)."""
     with contextlib.redirect_stdout(io.StringIO()):
         env = make_tensor("go2_weight_rest_hi_at_0", n, DEV, adversary=True,
                           **({"render_mode": "rgb_array"} if render else {}))
@@ -115,6 +117,7 @@ def rollout(cond, arm, n=N, cal=False, record=False, render=False):
     trig_t = th.full((n,), float("nan"), device=DEV)
     deaths = {s: 0 for s in STATES}
     S, cal_tr = [], []
+    cal_vals = []
     traj, sttr, alv_tr, frames = [], [], [], []
     if render:
         import mujoco as _mj
@@ -166,6 +169,10 @@ def rollout(cond, arm, n=N, cal=False, record=False, render=False):
             above = th.where(vu_bar > EPS_UP_LEG, above + 1, th.zeros_like(above))
             abort_c = th.where(vu_bar < EPS_ABORT_LEG, abort_c + 1, th.zeros_like(abort_c))
             go_up = (st == 2) & (above >= K_UP) & (ok_c >= HEAL_SUST) & can
+            if cal_up:
+                go_up = th.zeros_like(go_up)
+                if bool((ok_c >= HEAL_SUST).any()):
+                    cal_vals.append(vu_bar[alive & (st == 2) & (settle >= 5) & (ok_c >= HEAL_SUST)].clone())
             go_abort = (st == 3) & (abort_c >= K_ABORT)
         elif arm == "V1":
             v1_above = th.where(vs_bar > 0.15, v1_above + 1, th.zeros_like(v1_above))
@@ -220,7 +227,7 @@ def rollout(cond, arm, n=N, cal=False, record=False, render=False):
     out = {"S": S, "safe": S[-1], "success": float(reached.float().mean()),
            "t_goal_med": float(tg.median()) if tg.numel() else None,
            "trig_med": float(tt.median()) if tt.numel() else None,
-           "deaths": deaths, "cal": cal_tr if cal else None}
+           "deaths": deaths, "cal": cal_tr if cal else None, "cal_up": cal_vals}
     if record:
         out["traj"] = th.stack(traj).cpu().numpy(); out["sttr"] = th.stack(sttr).cpu().numpy()
         out["alv_tr"] = th.stack(alv_tr).cpu().numpy()
@@ -236,7 +243,13 @@ if __name__ == "__main__":
     ap.add_argument("--cal", action="store_true")
     ap.add_argument("--videos", action="store_true")
     ap.add_argument("--cond", default="legonly")
+    ap.add_argument("--cal-up", action="store_true",
+                    help="V_up on settled-rest robots after the leg heals, return disabled (EPS_UP_LEG)")
     args = ap.parse_args()
+    if args.cal_up:
+        r = rollout(args.cond, "V2-REUSE", cal_up=True)
+        cal_summary("V_up on settled rest, leg healed (W=0)", r["cal_up"], EPS_UP_LEG, "above")
+        sys.exit(0)
     OD = os.path.expanduser(_ART + "/E091-leg-walk")
     os.makedirs(OD, exist_ok=True)
     if args.cal:

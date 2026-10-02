@@ -26,7 +26,7 @@ sys.path.insert(0, "external/go2_atomic_skills")
 import numpy as np
 from robot_safety_sandbox import make_tensor, spec
 from robot_safety_sandbox.eval.policies import load_twin
-from E084_automaton import (CK, load_twins, value_of, in_rest_target, in_stance_target,
+from E084_automaton import (CK, load_twins, cal_summary, value_of, in_rest_target, in_stance_target,
                             EPS_UP, K_UP, EPS_ABORT, K_ABORT, REFRACT, ALPHA)
 import E089_goal_walk as G
 
@@ -59,7 +59,9 @@ def Wh_of(sched, t):
     return W, h
 
 
-def rollout(sched, arm, n=N, record=False, render=False):
+def rollout(sched, arm, n=N, record=False, render=False, cal_up=False):
+    """cal_up=True (arm V2): return disabled; collects EMA V_up on settled-rest robots once the debounced belief
+    says the load has cleared — the population the return gate sees (calibrates EPS_UP_92)."""
     with contextlib.redirect_stdout(io.StringIO()):
         env = make_tensor("go2_weight_rest_hi_at_0", n, DEV, adversary=True,
                           **({"render_mode": "rgb_array"} if render else {}))
@@ -97,6 +99,7 @@ def rollout(sched, arm, n=N, record=False, render=False):
     early_desc = 0
     deaths = {s: 0 for s in STATES}
     S, SUC = [], []
+    cal_vals = []
     traj, sttr, alv_tr, frames = [], [], [], []
     if render:
         import mujoco as _mj
@@ -143,6 +146,10 @@ def rollout(sched, arm, n=N, record=False, render=False):
             go_up = (st == 2) & (above >= K_UP) & can
             if wlow < UP_SUST:                       # debounced belief: sustained-clear, not instantaneous
                 go_up = th.zeros_like(go_up)
+            if cal_up:
+                go_up = th.zeros_like(go_up)
+                if wlow >= UP_SUST:
+                    cal_vals.append(vu_bar[alive & (st == 2) & (settle >= 5)].clone())
             go_abort = (st == 3) & (abort_c >= K_ABORT)
         elif arm == "V1":
             v1_above = th.where(vs_bar > 0.15, v1_above + 1, th.zeros_like(v1_above))
@@ -201,7 +208,7 @@ def rollout(sched, arm, n=N, record=False, render=False):
     tg = t_goal[reached]
     out = {"S": S, "SUC": SUC, "safe": S[-1], "success": SUC[-1],
            "t_goal_med": float(tg.median()) if tg.numel() else None,
-           "early_desc": early_desc, "deaths": deaths}
+           "early_desc": early_desc, "deaths": deaths, "cal": cal_vals}
     if record:
         out["traj"] = th.stack(traj).cpu().numpy(); out["sttr"] = th.stack(sttr).cpu().numpy()
         out["alv_tr"] = th.stack(alv_tr).cpu().numpy()
@@ -275,7 +282,13 @@ def topdown_fig(sched, data, od):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--videos", action="store_true")
+    ap.add_argument("--cal-up", action="store_true",
+                    help="V_up on settled-rest robots after the load clears, return disabled (EPS_UP_92)")
     args = ap.parse_args()
+    if args.cal_up:
+        r = rollout("period", "V2", cal_up=True)
+        cal_summary("V_up on settled rest, load cleared (W=0, walking regime)", r["cal"], EPS_UP_92, "above")
+        sys.exit(0)
     OD = os.path.expanduser(_ART + "/E092-payload-walk")
     os.makedirs(OD, exist_ok=True)
     if args.videos:

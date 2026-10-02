@@ -194,11 +194,17 @@ first. The standing videos are produced by the `standing` target (E086).
 
 ## 10. Retraining the policies
 
-All 16 policies are reach-avoid PPO twins trained with the sandbox trainer; recipes, configs, warm-start
-chains and wall-clock times are in [TRAINING.md](TRAINING.md). A single policy takes 15–70 min on a 4070.
-Retrained policies will not reproduce the checkpoints byte-for-byte (GPU nondeterminism), and the runtime
-thresholds in [SWITCHING_LOGIC.md](SWITCHING_LOGIC.md) were calibrated on these particular value nets —
-recalibrate them (E089 `--cal`, E091 `--cal`) after retraining.
+To reproduce from scratch instead of from the shipped checkpoints:
+
+```bash
+bash scripts/train_all.sh core            # ~2 h: the 4 policies sections 1-5 run on
+bash scripts/train_all.sh certificates    # ~4 h: the 7 behind sections 6-8
+```
+
+Then recalibrate the switching thresholds — each experiment script has a `--cal` / `--cal-up` / `--cal-dn`
+probe — and rerun the targets above. Full procedure, per-policy recipes and the calibration table:
+[TRAINING.md](TRAINING.md). Retrained policies give different but comparable numbers (single training seed,
+GPU nondeterminism).
 
 ---
 

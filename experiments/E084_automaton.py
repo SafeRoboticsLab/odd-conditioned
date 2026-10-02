@@ -74,13 +74,28 @@ def in_stance_target(inner):
     return (d.root_link_pos_w[:, 2] > 0.20) & (tilt < 0.25) & (v < 0.30)
 
 
+def cal_summary(name, vals, thr, side):
+    """Print the distribution of a calibration signal and where the current threshold cuts it.
+    side='above': fraction >= thr fires (a return gate); side='below': fraction < thr fires (a descent trigger)."""
+    v = th.cat([x.flatten() for x in vals]).float().cpu() if vals else th.zeros(0)
+    if v.numel() == 0:
+        print(f"{name}: no samples"); return
+    q = th.quantile(v, th.tensor([0.05, 0.25, 0.5, 0.75, 0.95]))
+    frac = float((v >= thr).float().mean()) if side == "above" else float((v < thr).float().mean())
+    print(f"{name}: n={v.numel()}  p5 {q[0]:+.3f}  p25 {q[1]:+.3f}  p50 {q[2]:+.3f}  p75 {q[3]:+.3f}  "
+          f"p95 {q[4]:+.3f}  | current threshold {thr:+.3f} fires on {frac:.0%}")
+
+
 def value_of(env, model, norm):
     obs = env.mj._zoo_last_obs
     with th.no_grad():
         return model.policy.predict_values(norm(obs)).squeeze(-1)
 
 
-def rollout(sched, cond, arm):
+def rollout(sched, cond, arm, cal=None):
+    """cal=None: the evaluation. cal="up" (arm V2): return disabled; collects EMA V_up on settled-rest robots
+    while the ODD has cleared (the population the return gate sees). cal="dn": collects EMA V_stand on
+    robots in STAND (the population the descent trigger sees)."""
     with contextlib.redirect_stdout(io.StringIO()):
         env = make_tensor("go2_weight_rest_hi_at_0", N, DEV, adversary=True)
         tw = load_twins()
@@ -100,6 +115,7 @@ def rollout(sched, cond, arm):
     deaths = {s: 0 for s in STATES}
     S = []
     v1_in_rest = th.zeros(N, dtype=th.bool, device=DEV)  # for V1/ONE-WAY arms
+    cal_vals = []
     for t in range(STEPS):
         W = W_of(sched, t)
         env.base_load = th.tensor([0., 0., -W], device=DEV)[None].expand(N, 3).contiguous()
@@ -123,6 +139,10 @@ def rollout(sched, cond, arm):
             go_up = (st == 2) & (above >= K_UP) & can
             if UP_W_GATE is not None and W >= UP_W_GATE:
                 go_up = th.zeros_like(go_up)
+            if cal == "up":
+                go_up = th.zeros_like(go_up)
+                if W < (UP_W_GATE if UP_W_GATE is not None else 130.0):
+                    cal_vals.append(vu_bar[alive & (st == 2) & (settle >= 5)].clone())
             go_stand = (st == 3) & (standok >= 5)
             go_abort = (st == 3) & (abort_c >= K_ABORT)
             st = th.where(go_desc, th.ones_like(st), st)
@@ -166,6 +186,8 @@ def rollout(sched, cond, arm):
         for si, sname in enumerate(STATES):
             deaths[sname] += int((newdead & (st == si)).sum())
         alive &= ~(tip | slam)
+        if cal == "dn" and t >= WARMUP:
+            cal_vals.append(vs_bar[alive & (st == 0)].clone())
         d = inner.scene["robot"].data
         pg = d.projected_gravity_b
         standing = (d.root_link_pos_w[:, 2] > 0.18) & (th.maximum(pg[:, 0].abs(), pg[:, 1].abs()) < 0.3)
@@ -173,10 +195,31 @@ def rollout(sched, cond, arm):
         S.append(float(alive.float().mean()))
     env.close()
     afford = float((stand_time / alive_time.clamp_min(1)).mean())
-    return {"S": S, "final": S[-1], "afford_alive": afford, "deaths": deaths}
+    return {"S": S, "final": S[-1], "afford_alive": afford, "deaths": deaths, "cal": cal_vals}
 
 
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--cal-dn", action="store_true",
+                    help="V_stand on standing robots at constant light / boundary / heavy load (EPS_DN)")
+    ap.add_argument("--cal-up", action="store_true",
+                    help="V_up on settled-rest robots once the load has cleared, return disabled (EPS_UP)")
+    args = ap.parse_args()
+    if args.cal_dn:
+        import sys as _sys
+        me = _sys.modules[__name__]
+        saved = me.W_of
+        for Wfix in (40.0, 130.0, 220.0):
+            me.W_of = lambda sched, t, _w=Wfix: _w
+            r = rollout("square", "benign", "STAND-ONLY", cal="dn")
+            cal_summary(f"V_stand standing @W={Wfix:.0f}", r["cal"], EPS_DN, "below")
+        me.W_of = saved
+        raise SystemExit(0)
+    if args.cal_up:
+        r = rollout("square", "benign", "V2", cal="up")
+        cal_summary("V_up on settled rest, load cleared (W=40)", r["cal"], EPS_UP, "above")
+        raise SystemExit(0)
     arms = ["V2", "V2-REUSE", "V1", "ONE-WAY", "STAND-ONLY", "REST-ONLY"]
     out = {}
     for cond in ("benign", "gusty"):

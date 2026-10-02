@@ -11,6 +11,32 @@ overrides. The nominal walker was not trained in this project (§3).
 > env code was committed only after training (2026-10-02, sandbox `a3c14f2`), at its final state: the
 > abandoned getup v1 and descend v1/v3 spawn distributions cannot be rebuilt from it.
 
+## 0. Train everything from scratch (instead of using the shipped checkpoints)
+
+```bash
+source activate.sh
+bash scripts/train_all.sh core            # the 4 policies the automaton runs on      ~2 h on an RTX 4070
+bash scripts/train_all.sh certificates    # the 7 behind the certificate figures/demos ~4 h
+pytest -q tests/                          # smoke suite against the new checkpoints (the checksum test will
+                                          # report a mismatch — expected, they are new weights)
+```
+
+`train_all.sh` runs the policies one after another in dependency order (`rest` before `descend`, which
+warm-starts from it; `getup1` before `getup`) and writes each to the exact `results/` path the experiment
+scripts load, so nothing else has to change. It never overwrites an existing run directory (set `FORCE=1` to
+allow it), logs to `results/logs/<name>.log`, and keeps wandb off unless `ODD_WANDB=1`. `SMOKE=1` runs every
+command for a few hundred thousand steps in a scratch directory — a two-minute-per-policy check that the
+commands work, not a usable policy.
+
+Then **recalibrate the switching thresholds** (§6) — they were tuned to the shipped value networks — and
+rerun the reproductions ([REPRODUCE.md](REPRODUCE.md)). Expect different but comparable numbers: each policy
+is one training run (seed 0), and GPU training is not bit-reproducible.
+
+What a from-scratch run cannot reproduce exactly: getup v1 was originally trained on narrower prone spawns that
+the current code no longer has, so `getup1` now trains on the widened ranges; the two-stage get-up (100M steps
+total) is kept so the training budget matches. The walker is not retrained (§3) — it ships in the
+`go2_atomic_skills` submodule.
+
 ## 1. Command
 
 From the repo root, after `source activate.sh`:
@@ -166,3 +192,28 @@ Every path ends in `/checkpoints/model_49999872_steps.zip`. `CK` is the dict in 
 
 Earlier experiments (E040–E069) load the payload and weak-leg runs (`results/go2_payload_runs/`,
 `results/go2_weak_leg_runs/`, ~4 GB); those checkpoints are not in the bundle — ask if you need them.
+
+## 6. Recalibrating the switching thresholds (after any retraining)
+
+The automata compare learned values against fixed thresholds (constants at the top of each experiment script).
+Those numbers were read off the distributions of the *shipped* value networks; a retrained network has a
+different scale, so measure the same distributions and re-place each threshold by the same rule. Each probe
+below takes under a minute on a 4070 and prints percentiles plus the fraction the current threshold fires on.
+
+| threshold (script: constant) | measure with | where the shipped threshold sits | rule |
+|---|---|---|---|
+| standing descent, `E084_automaton.py`: `EPS_DN = -0.05` (×`K_DN = 5` steps) | `python experiments/E084_automaton.py --cal-dn` — `V̄_stand` on standing robots at W = 40 / 130 / 220 N | fires on 7 % of samples at 40 N, 22 % at 130 N, 83 % at 220 N | between the light-load and heavy-load bands; the K-step sustain removes most single-sample false fires |
+| standing return, `E084_automaton.py`: `EPS_UP = 0.10` (×15), abort `EPS_ABORT = -0.02` (×10) | `python experiments/E084_automaton.py --cal-up` — `V̄_up` on settled-rest robots once the load has cleared, return disabled | passes 6 % of samples (median −0.15) — strict; it was raised from 0.02 after get-ups fired under a 220 N load | return threshold where the cleared-load rest poses pass but loaded ones do not; abort ~0.1 below it |
+| walking descent (weight walk), `E089_goal_walk.py`: `EPS_DN_WALK = -0.15` (×`K_DN_WALK = 10`) | `python experiments/E089_goal_walk.py --cal` — `V̄_stand` while walking at W = 0 / 120 / 220 N; then try values with `--eps_dn` | healthy walking: p1 −0.10, p5 −0.07; loaded walking: median −0.12 to −0.16 | chosen from a sweep of false descents on healthy walking (1.6 % per 30 s) against detection delay (0.57 s at 220 N) |
+| leg-fault detector, `E091_leg_walk.py`: `ERR_DEG = 0.03` (×`K_DEG = 10`) | `python experiments/E091_leg_walk.py --cal` — torque-saturation residual on healthy vs derated walking | healthy p99 0.0000; derated median 0.008, p99 0.086 | above the healthy band with margin. Depends on the walker and the physics, not on the safety networks — only needs redoing if the walker changes |
+| leg-fault return, `E091_leg_walk.py`: `EPS_UP_LEG = -0.35`, abort `EPS_ABORT_LEG = -0.45` | `python experiments/E091_leg_walk.py --cal-up` | ≈ 12th percentile of `V̄_up` on settled rest after the leg heals (passes 88 %) | a little below the settled-rest median, so most robots qualify once the belief says the leg is healthy (the belief carries the ODD decision; the certificate screens out bad poses); abort ~0.1 lower |
+| payload-walk return, `E092_payload_walk.py`: `EPS_UP_92 = -0.30`, abort `EPS_ABORT_92 = -0.45` | `python experiments/E092_payload_walk.py --cal-up` | ≈ 35th percentile (passes 65 %; median −0.28) | same rule; abort ~0.15 lower |
+| one-way demo triggers: `E074_ramp.py` −0.04, `E075_ramp.py` −0.05, `E078_ramp.py` −0.14 | the matching `*_value.py` sweeps; `E074_tune.py` (forced-switch sweep) | inside the window where a forced switch is mechanically safe | same idea as the standing descent |
+
+Not tied to the networks (no recalibration needed): the E092 load-belief trigger `W_TRIG = 60 N` (the edge of
+the walker's comfortable load), the return gate `UP_W_GATE = 130 N` (the measured stand-feasibility boundary),
+and the timing constants (EMA α, warm-up, refractory, sustain counts).
+
+After recalibrating, rerun `bash scripts/reproduce.sh e092 e091 standing` and compare with the expected tables;
+the structural results (REST-ONLY 1.00, WALK-ONLY 0.00, ODD-conditioned ≈ ONE-WAY safety with ~0.4 success on
+the ramp) should hold, the exact rates will move.

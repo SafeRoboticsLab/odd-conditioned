@@ -28,6 +28,7 @@ pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
 pip install -r requirements.txt
 source activate.sh                          # every session; prints "resolution : OK"
 bash scripts/fetch_bundles.sh --from <dir>  # the checkpoint archive you were sent -> results/ (verified)
+#   ...or train them yourself: bash scripts/train_all.sh core certificates  (~6 h; see docs/TRAINING.md)
 pytest -q tests/                            # smoke suite, ~35 s
 bash scripts/reproduce.sh e092              # the walking table above, ~6 min -> repro/E092-payload-walk/
 ```
