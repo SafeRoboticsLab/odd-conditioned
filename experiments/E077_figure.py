@@ -11,14 +11,15 @@ certificate stays FLAT (~0, non-monotone) because the reactive stance policy ABS
 leg — the figure is a CONTRAST, and the title says so.
 """
 import os, json
+from _paths import _ART
 import numpy as np
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-W74 = os.path.expanduser("~/artifacts/odd-conditioned/E074-hicom-demo/task2_value.json")
-WRC = os.path.expanduser("~/artifacts/odd-conditioned/E075-recal-eval/partA_value.json")
-LEG = os.path.expanduser("~/artifacts/odd-conditioned/E076-leg-demo/partB_value.json")
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E077-figures")
+W74 = os.path.expanduser(_ART + "/E074-hicom-demo/task2_value.json")
+WRC = os.path.expanduser(_ART + "/E075-recal-eval/partA_value.json")
+LEG = os.path.expanduser(_ART + "/E076-leg-demo/partB_value.json")
+OUT = os.path.expanduser(_ART + "/E077-figures")
 
 
 def main():

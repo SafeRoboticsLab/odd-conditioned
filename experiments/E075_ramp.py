@@ -10,6 +10,7 @@ tip 0.21, afford 0.46. Oracle safe-switch band: W∈[40,120], tips 0.03-0.05. Re
 switch-W mean±std, tip/slam/affordance vs those.
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -31,8 +32,8 @@ PULL = th.tensor([0., 1., 0.])
 CK = "results/go2_weight_runs/go2_weight_{m}_adv/checkpoints/model_49999872_steps.zip"
 RECAL = "results/go2_weight_runs/E075_recal/go2_weight_stand_hi_adv/checkpoints/model_49999872_steps.zip"
 TASK = "go2_weight_rest_hi_at_0"
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E075-recal-eval")
-E074_JSON = os.path.expanduser("~/artifacts/odd-conditioned/E074-hicom-demo/task3_ramp.json")
+OUT = os.path.expanduser(_ART + "/E075-recal-eval")
+E074_JSON = os.path.expanduser(_ART + "/E074-hicom-demo/task3_ramp.json")
 
 # arm -> (stand-phase policy ckpt, rest-phase policy ckpt, rule). RECAL replaces stand_hi on the stand side.
 ARMS = {

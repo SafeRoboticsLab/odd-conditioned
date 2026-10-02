@@ -7,6 +7,7 @@ sim still auto-resets, so a fallen robot may visibly respawn — it no longer co
 Graph: W(t) + gusts, no-respawn survival per arm, V2 automaton-state ribbon.
 """
 import os, sys, io, contextlib, math, mujoco
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
@@ -20,7 +21,7 @@ except Exception:
     HAVE_PIL = False
 from robot_safety_sandbox import make_tensor, spec
 from robot_safety_sandbox.eval.policies import load_twin
-from E084_automaton import (CK, W_of, gust_scale, value_of, in_rest_target, in_stance_target,
+from E084_automaton import (CK, load_twins, W_of, gust_scale, value_of, in_rest_target, in_stance_target,
                             EPS_DN, K_DN, EPS_UP, K_UP, EPS_ABORT, K_ABORT, REFRACT, ALPHA, DT, STEPS,
                             WARMUP, UP_W_GATE)
 
@@ -40,7 +41,7 @@ def rollout(sched, cond, arm):
         env = make_tensor("go2_weight_rest_hi_at_0", N, DEV, adversary=True, render_mode="rgb_array")
         try: env.mj.cfg.viewer.max_extra_envs = N - 1
         except Exception: pass
-        tw = {k: load_twin(v, DEV, quiet=True) for k, v in CK.items() if os.path.exists(v)}
+        tw = load_twins()
     inner = env.mj
     inner.cfg.episode_length_s = 10_000.0   # kill the 20s timeout: no free mid-eval resets (Buzi's catch)
     mm = inner.sim.mj_model
@@ -174,7 +175,7 @@ def graph_frame(i, sched, cond, data, spans, W, H):
 
 
 if __name__ == "__main__":
-    od = os.path.expanduser("~/artifacts/odd-conditioned/E084-automaton")
+    od = os.path.expanduser(_ART + "/E084-automaton")
     for cond in ("benign", "gusty"):
         for sched in ("square", "sine"):
             grids, surv, sm = {}, {}, None

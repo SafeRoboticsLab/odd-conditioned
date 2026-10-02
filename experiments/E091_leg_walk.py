@@ -3,12 +3,15 @@
 Scenario ("thermal"): the robot walks toward a goal 11 m ahead; at t=5 s one leg's motors derate
 (θ: 1.0 -> 0.15 linearly over 3 s — thermal protection), stay dead until t=15 s, then recover (cooled).
 Horizon 30 s. The goal is NOT reachable before the fault (≤ ~6 m) — ONLY strategies that survive the fault
-AND resume walking can succeed. Conditions: legonly (W=0) and compound (constant 60 N high-CoM payload).
+AND resume walking can succeed. The main run is `legonly` (W=0); `--cond compound` (constant W_COMPOUND
+high-CoM payload) is kept for exploration but was dropped from the reported experiment (load + walking is the
+E089 boundary).
 
 Detection (the honest channel): V̄_stand is BLIND to actuator faults (E091 probe: hobbling robots read
 V̄=+0.07) — unmodeled θ changes don't manifest in the value's modeled state. The descent trigger is therefore
-a BELIEF residual: per-leg joint tracking error (|q - q_target| with q_target = default + 0.75·a), the
-E018 set-membership idea made model-free. V̄<-0.10 remains as an OR-term.
+a BELIEF residual: the per-leg torque-saturation gap (demanded PD torque vs achieved actuator force, see
+make_residual), the E018 set-membership idea made model-free. The trigger is residual-ONLY (EMA > ERR_DEG
+for K_DEG steps); V̄_stand is computed but not used to trigger.
 
 Arms (all switching arms share the SAME descent trigger; they differ ONLY in the return —
 the discriminator this experiment is built around):
@@ -21,15 +24,16 @@ Deaths = env spec (fell_over | illegal_contact). N=256, no respawn, timeout disa
 Modes: --cal (residual detector calibration), main (stats+figures), --videos.
 """
 import os, sys, io, math, json, contextlib, argparse
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
-sys.path.insert(0, "/home/buzi/Desktop/RESEARCH/SAFE/DEVELOPMENT/go2_atomic_skills")
+sys.path.insert(0, "external/go2_atomic_skills")
 import numpy as np
 from robot_safety_sandbox import make_tensor, spec
 from robot_safety_sandbox.eval.policies import load_twin
 from robot_safety_sandbox.envs.go2_broken_leg.env_cfg import _ensure_fr_cache
-from E084_automaton import (CK, value_of, in_rest_target, in_stance_target,
+from E084_automaton import (CK, load_twins, value_of, in_rest_target, in_stance_target,
                             EPS_UP, K_UP, EPS_ABORT, K_ABORT, REFRACT, ALPHA, K_DN, WARMUP)
 import E089_goal_walk as G
 
@@ -84,7 +88,7 @@ def rollout(cond, arm, n=N, cal=False, record=False, render=False):
         if render:
             try: env.mj.cfg.viewer.max_extra_envs = n - 1
             except Exception: pass
-        tw = {k: load_twin(v, DEV, quiet=True) for k, v in CK.items() if os.path.exists(v)}
+        tw = load_twins()
     inner = env.mj
     inner.cfg.episode_length_s = 10_000.0
     _ensure_fr_cache(inner)
@@ -233,7 +237,7 @@ if __name__ == "__main__":
     ap.add_argument("--videos", action="store_true")
     ap.add_argument("--cond", default="legonly")
     args = ap.parse_args()
-    OD = os.path.expanduser("~/artifacts/odd-conditioned/E091-leg-walk")
+    OD = os.path.expanduser(_ART + "/E091-leg-walk")
     os.makedirs(OD, exist_ok=True)
     if args.cal:
         r = rollout(args.cond, "WALK-ONLY", n=64, cal=True)

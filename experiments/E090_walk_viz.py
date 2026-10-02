@@ -10,9 +10,10 @@
    graph strip = W(t) + live median distance-to-goal per arm.
 """
 import os, sys, math, json
+from _paths import _ART
 import numpy as np
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
-sys.path.insert(0, "/home/buzi/Desktop/RESEARCH/SAFE/DEVELOPMENT/go2_atomic_skills")
+sys.path.insert(0, "external/go2_atomic_skills")
 os.environ.setdefault("MUJOCO_GL", "egl")
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -29,7 +30,7 @@ ARMS = ["WALK-ONLY", "REST-ONLY", "ONE-WAY", "V1", "V2-REUSE"]
 VARMS = ["WALK-ONLY", "V2-REUSE", "ONE-WAY"]
 COL = {"WALK-ONLY": "#c0392b", "REST-ONLY": "#1e8449", "ONE-WAY": "#e67e22", "V1": "#8e44ad", "V2-REUSE": "#1a5276"}
 STNAME = {0: "WALK", 1: "DESCENDING", 2: "REST", 3: "GETTING-UP"}
-OD = os.path.expanduser("~/artifacts/odd-conditioned/E089-goal-walk")
+OD = os.path.expanduser(_ART + "/E089-goal-walk")
 DT4 = 4 * G.DT
 
 

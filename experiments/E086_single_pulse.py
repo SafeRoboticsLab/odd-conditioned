@@ -7,6 +7,7 @@ recover the final light phase — the transit-count argument's best case. Surviv
 no respawn); same 6 arms; videos as E085 (V1 | V2 | ONE-WAY).
 """
 import os, sys, math, json
+from _paths import _ART
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
 os.environ.setdefault("MUJOCO_GL", "egl")
 import numpy as np
@@ -29,7 +30,7 @@ EV.STEPS = STEPS; EV.W_of = W_of
 E.UP_W_GATE = 130.0; EV.UP_W_GATE = 130.0   # belief-gated return: only when W back in stand ODD
 
 if __name__ == "__main__":
-    od = os.path.expanduser("~/artifacts/odd-conditioned/E084-automaton")
+    od = os.path.expanduser(_ART + "/E084-automaton")
     out = {}
     for cond in ("benign", "gusty"):
         for sched in ("pulse", "period"):

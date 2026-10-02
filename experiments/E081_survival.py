@@ -6,6 +6,7 @@ masked out of all statistics). Report S(t) per method and final survival. Two di
 Methods: STAND-ONLY, REST-ONLY, ONE-WAY handoff, BIDIR handoff. Square & sine W(t) waves as E080.
 """
 import os, sys, io, contextlib, json, math
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
@@ -89,6 +90,6 @@ if __name__ == "__main__":
                 S = rollout(sched, cond, arm)
                 out[f"{cond}|{sched}|{arm}"] = S
                 print(f"  {arm:>10}: S(5s)={S[249]:.2f}  S(10s)={S[499]:.2f}  S(20s)={S[-1]:.2f}")
-    od = os.path.expanduser("~/artifacts/odd-conditioned/E080-bidirectional")
+    od = os.path.expanduser(_ART + "/E080-bidirectional")
     json.dump(out, open(f"{od}/survival.json", "w"))
     print(f"\nsaved -> {od}/survival.json")

@@ -16,10 +16,11 @@ monotonically with W (0.044@W0 -> -0.012@W250 under the stand policy at pull 0.2
 
 Usage:  python experiments/E071_handoff.py            # runs both pulls (0.2, 0.5) + trigger sweep @0.2
         python experiments/E071_handoff.py --pull 0.2 # single pull
-Outputs: ~/artifacts/odd-conditioned/E071-handoff/{results.json, README.txt}
+Outputs: $ODD_ARTIFACTS/E071-handoff/{results.json, README.txt}
 """
 
 from __future__ import annotations
+from _paths import _ART
 
 import argparse
 import contextlib
@@ -47,7 +48,7 @@ EPS = 0.015                                          # handoff trigger threshold
 HYST = 5                                             # consecutive V<eps steps before permanent switch
 W_ORACLE = 180.0                                     # envelope-known W* for the oracle handoff
 CK = "results/go2_weight_runs/go2_weight_{m}_adv/checkpoints/model_49999872_steps.zip"
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E071-handoff")
+OUT = os.path.expanduser(_ART + "/E071-handoff")
 
 # Slam cap (rest-spec safety): nonfoot ground force must stay under 80 + 1.3*W(t).
 CAP_BASE, CAP_SLOPE = 80.0, 1.3

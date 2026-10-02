@@ -1,9 +1,10 @@
 """Draw the E062 ODD-dynamics figure from saved traces (no rollouts). Edit + rerun freely for style tweaks."""
 import os, numpy as np
+from _paths import _ART
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E062-odd-dynamics")
+OUT = os.path.expanduser(_ART + "/E062-odd-dynamics")
 d = np.load(f"{OUT}/traces.npz", allow_pickle=True)
 STEPS, T0, DT = int(d["steps"]), int(d["t0"]), float(d["dt"])
 SCHED = list(d["sched"]); ARMS = ["blind", "history", "conditioned"]

@@ -1,6 +1,7 @@
 """E092 — THE PAYLOAD-SWAP WALKING EVALUATION (Buzi's two claims, weight-ladder setup).
 
-ODD = the carried payload, jointly (W, h): light = (40 N, h 0.25) — the walker's comfort zone; heavy =
+ODD = the carried payload, jointly (W, h): light = UNLOADED (W 0, h 0.25) — the walker's comfort zone
+(it was trained at W=0; even 40 N taxed every arm ~45% over 40 s, so iteration-3 dropped it); heavy =
 (220 N, h 0.40) — a TALL heavy object: fatal to ANYTHING upright (walker 0.00, stand expert 0.00, stopping
 0.36-and-useless; probes 2026-08-24) while settled rest reads 1.00. Schedules: pulse (step, t in [5,13)s)
 and period (sin^2 bump, same window; h interpolates with W). Horizon 40 s, goal 12 m (pre-pulse reach <=
@@ -17,14 +18,15 @@ belief-gated certified get-up -> walk). All switching arms share the trigger (V�
 and the brake; they differ only in the return.
 """
 import os, sys, io, math, json, contextlib, argparse
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
-sys.path.insert(0, "/home/buzi/Desktop/RESEARCH/SAFE/DEVELOPMENT/go2_atomic_skills")
+sys.path.insert(0, "external/go2_atomic_skills")
 import numpy as np
 from robot_safety_sandbox import make_tensor, spec
 from robot_safety_sandbox.eval.policies import load_twin
-from E084_automaton import (CK, value_of, in_rest_target, in_stance_target,
+from E084_automaton import (CK, load_twins, value_of, in_rest_target, in_stance_target,
                             EPS_UP, K_UP, EPS_ABORT, K_ABORT, REFRACT, ALPHA)
 import E089_goal_walk as G
 
@@ -64,7 +66,7 @@ def rollout(sched, arm, n=N, record=False, render=False):
         if render:
             try: env.mj.cfg.viewer.max_extra_envs = n - 1
             except Exception: pass
-        tw = {k: load_twin(v, DEV, quiet=True) for k, v in CK.items() if os.path.exists(v)}
+        tw = load_twins()
     inner = env.mj
     inner.cfg.episode_length_s = 10_000.0
     tmn = inner.termination_manager
@@ -274,7 +276,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--videos", action="store_true")
     args = ap.parse_args()
-    OD = os.path.expanduser("~/artifacts/odd-conditioned/E092-payload-walk")
+    OD = os.path.expanduser(_ART + "/E092-payload-walk")
     os.makedirs(OD, exist_ok=True)
     if args.videos:
         # SINGLE BEST RUN per method (Buzi): up to 6 solo (n=1) rendered tries per arm; keep the first

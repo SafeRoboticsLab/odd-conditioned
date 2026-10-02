@@ -16,6 +16,7 @@ Success signature: HANDOFF survives the early gust STANDING, switches near θ_c�
 at the late gusts on the dying leg.
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -40,7 +41,7 @@ STAND = "results/go2_compound_runs/go2_compound_stand_adv/checkpoints/model_4999
 REST  = "results/go2_compound_runs/go2_compound_rest_adv/checkpoints/model_49999872_steps.zip"
 PULL = th.tensor([0., 1., 0.])
 TASK = "go2_compound_rest"                          # permissive common cfg (500N contact); θ+W driven per step
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E078-compound-demo")
+OUT = os.path.expanduser(_ART + "/E078-compound-demo")
 
 ARMS = {
     "STAND-ONLY": (STAND, STAND, "none"),

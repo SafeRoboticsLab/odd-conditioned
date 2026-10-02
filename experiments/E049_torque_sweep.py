@@ -20,6 +20,7 @@ differently than one that pushes off it). A FLAT matrix + identical drift = one 
 bifurcation (the payload story), i.e. sound PPO absorbed the ODD.
 """
 import os, sys
+from _paths import _ART
 os.environ.setdefault("MUJOCO_GL", "egl")
 import torch as th
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -89,7 +90,7 @@ if __name__ == "__main__":
             print(f"{pct:>6}% | " + " | ".join(f"{c:^24}" for c in cells))
     # save raw results for plotting
     import json
-    out = os.path.expanduser("~/artifacts/odd-conditioned/E049-torque-sweep")
+    out = os.path.expanduser(_ART + "/E049-torque-sweep")
     os.makedirs(out, exist_ok=True)
     with open(f"{out}/results.json", "w") as f:
         json.dump({f"{k[0]}|{k[1]}|{k[2]}": v for k, v in results.items()}, f, indent=2)

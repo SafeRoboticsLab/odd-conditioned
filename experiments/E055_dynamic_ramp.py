@@ -16,6 +16,7 @@ drop at the switch while conditioned/history hold → conditioning wins dynamica
 the leg ODD is absorbed reactively even under a sudden change → same negative conclusion as the static evals.
 """
 import os, sys, io, contextlib, math, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -93,7 +94,7 @@ if __name__ == "__main__":
             trans = surv[min(STEPS - 1, T_SWITCH + 25)]
             end = surv[-1]
             print(f"  {name:16s} surv@switch={pre:.2f}  +0.5s={trans:.2f}  end={end:.2f}  drop={pre-trans:+.2f}")
-    od = os.path.expanduser("~/artifacts/odd-conditioned/E055-dynamic-ramp")
+    od = os.path.expanduser(_ART + "/E055-dynamic-ramp")
     os.makedirs(od, exist_ok=True)
     json.dump({"steps": STEPS, "t_switch": T_SWITCH, "dt": DT, "theta_hi": THETA_HI, "theta_lo": THETA_LO,
                "force_N": FR * 50, "surv": out}, open(f"{od}/results.json", "w"), indent=2)

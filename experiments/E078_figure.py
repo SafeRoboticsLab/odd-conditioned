@@ -9,11 +9,12 @@ Shared x = normalized ODD degradation (0 = nominal/benign → 1 = maximal): W/25
 Title: the stand certificate contracts IFF the ODD change is non-absorbable — the filter knows when it is needed.
 """
 import os, json
+from _paths import _ART
 import numpy as np
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-A = os.path.expanduser("~/artifacts/odd-conditioned")
+A = os.path.expanduser(_ART)
 WRC = f"{A}/E075-recal-eval/partA_value.json"        # weight (contracts)
 LEG = f"{A}/E076-leg-demo/partB_value.json"          # unloaded leg (flat negative control)
 CMP = f"{A}/E078-compound-demo/task2_value.json"     # compound (contracts) — the new curve

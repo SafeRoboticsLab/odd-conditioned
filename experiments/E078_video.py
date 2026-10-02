@@ -9,6 +9,7 @@ Synced graph: θ(t), V_compound_stand + ε (CONTRACTS — unlike the flat unload
 switch window. Plus a static timeline figure (compound_timeline.png).
 """
 import os, sys, io, contextlib
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -43,7 +44,7 @@ TASK = "go2_compound_rest"
 PANELS = ["STAND-ONLY", "HANDOFF", "REST-ONLY"]
 RULE = {"STAND-ONLY": "none", "HANDOFF": "V", "REST-ONLY": "always"}
 COL = {"STAND-ONLY": "#e74c3c", "HANDOFF": "#2980b9", "REST-ONLY": "#27ae60"}
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E078-compound-demo")
+OUT = os.path.expanduser(_ART + "/E078-compound-demo")
 
 
 def theta_of(t):

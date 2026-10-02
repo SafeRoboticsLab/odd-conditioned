@@ -11,6 +11,7 @@ Expect: leg_stand good θ≥0.5, degrading below; leg_rest safe EVERYWHERE incl.
 extreme) — that θ=0 cell for leg_rest is the highlight (a fully-dead leg, lie down, no slam/tip).
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -27,7 +28,7 @@ AMBIENT, GUST = 0.20, 0.70                          # 10N ambient / 35N (10+25 g
 SLAM_N = 80.0
 PULL = th.tensor([0., 1., 0.])
 TASK = "go2_leg_rest"                              # permissive common cfg (500N contact term); θ driven per step
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E076-leg-demo")
+OUT = os.path.expanduser(_ART + "/E076-leg-demo")
 
 
 def cell(ck, theta):

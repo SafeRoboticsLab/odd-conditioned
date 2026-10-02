@@ -3,6 +3,7 @@ Trunk tint: gray->red with W in stand mode; BLUE while in rest mode. Graph: W(t)
 both thresholds, per-arm heights. Mirrors experiments/E080_bidirectional.py guard exactly.
 """
 import os, sys, io, contextlib, math, mujoco
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
@@ -122,7 +123,7 @@ def graph_frame(i, sched, data, W, H):
 
 
 if __name__ == "__main__":
-    od = os.path.expanduser("~/artifacts/odd-conditioned/E080-bidirectional")
+    od = os.path.expanduser(_ART + "/E080-bidirectional")
     for sched in ("square", "sine"):
         data, grids = {}, {}
         for arm in ARMS:

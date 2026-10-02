@@ -11,6 +11,7 @@ does V_unified stay >=0 / flat across W (no handoff signal) while V_stand crosse
 cannot emit the switch the spec-family's certificate does)?
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -27,7 +28,7 @@ FAIL_BAND = [200, 250]                      # standing fails (Task 1)
 PULL = th.tensor([0., 1., 0.])
 CK = "results/go2_weight_runs/go2_weight_{m}_adv/checkpoints/model_49999872_steps.zip"
 TASK = "go2_weight_rest_hi_at_0"
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E074-hicom-demo")
+OUT = os.path.expanduser(_ART + "/E074-hicom-demo")
 
 
 def curve():

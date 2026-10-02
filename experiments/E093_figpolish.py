@@ -6,9 +6,10 @@ F2 certifiable_regions : keep the geometry; ALL overlay text -> a proper legend 
 F7 cross_demo          : σ-across-states bars swamped the means -> LEFT: means with light σ bands;
                          RIGHT: the discrimination directly, d(x) = (V(0)-V(x))/σ̄  (contraction in σ units).
 F3 mode_ribbon         : audit y-limits from the DATA (no clipping), label the switch window, new names.
-Outputs overwrite ~/artifacts/odd-conditioned/E077-figures/ and copy into PAPER-draft/figs.
+Outputs overwrite $ODD_ARTIFACTS/E077-figures/ (default ~/artifacts/odd-conditioned) and copy into PAPER-draft/figs.
 """
 import os, json, shutil
+from _paths import _ART
 import numpy as np
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -19,7 +20,7 @@ plt.rcParams.update({                       # publication sizes (Buzi: figures s
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, Rectangle
 
-ART = os.path.expanduser("~/artifacts/odd-conditioned")
+ART = os.path.expanduser(_ART)
 OUT = f"{ART}/E077-figures"
 PD = f"{ART}/PAPER-draft/figs"
 SYS = "ODD-conditioned"

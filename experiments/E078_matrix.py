@@ -12,6 +12,7 @@ Per cell: stand%=(z>0.18 & tilt<0.3) | tip=fell_over | slam=nonfoot>184N (SLAM_C
 Expect: compound_stand good θ≥0.4, collapsing below (the trained θ_c≈0.3); compound_rest flat-safe incl. θ=0.
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -29,7 +30,7 @@ W, LOAD_H = 80.0, 0.25
 SLAM_N = 184.0                                     # SLAM_CAP(80)=80+1.3*80
 PULL = th.tensor([0., 1., 0.])
 TASK = "go2_compound_rest"                          # permissive common cfg (500N contact); θ+W driven per step
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E078-compound-demo")
+OUT = os.path.expanduser(_ART + "/E078-compound-demo")
 
 
 def cell(ck, theta):

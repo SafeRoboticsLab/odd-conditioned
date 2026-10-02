@@ -6,6 +6,7 @@ over seeds. Answers threats (a) does dynamic-blind close the gap, (c) seed sprea
 Usage: python experiments/E064_eval.py            # dynamic-trained arms, all seeds present
 """
 import os, sys, io, contextlib, glob, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -79,7 +80,7 @@ if __name__ == "__main__":
                 heh = np.array([v["pre_h"] for v in vals])
                 print(f"{arm:12s} {int(fr*50)}N  n={len(vals)}  surv={surv.mean():.2f}±{surv.std():.2f}  "
                       f"slam={slam.mean():.2f}  pre_height={heh.mean():.3f}m")
-    out = os.path.expanduser("~/artifacts/odd-conditioned/E064-fair-fight")
+    out = os.path.expanduser(_ART + "/E064-fair-fight")
     os.makedirs(out, exist_ok=True)
     json.dump({f"{a}|{f}": v for (a, f), v in results.items()}, open(f"{out}/results.json", "w"), indent=2)
     print(f"\nsaved -> {out}/results.json  (HEDGING: lower pre_height = more pre-emptive crouch = hidden cost)")

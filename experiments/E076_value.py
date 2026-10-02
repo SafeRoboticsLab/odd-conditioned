@@ -9,6 +9,7 @@ handoff has no trigger signal — report and skip the handoff. eps = midpoint of
 band θ≥0.5} and {mean V over the failed band θ≤0.1}. (leg_stand had 0.37 train failure → expect V noise.)
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -26,7 +27,7 @@ PULL_SCALE = 0.20
 LEG_STAND = "results/go2_leg_family_runs/go2_leg_stand_adv/checkpoints/model_49999872_steps.zip"
 PULL = th.tensor([0., 1., 0.])
 TASK = "go2_leg_rest"                              # common surface (θ driven per step); actor obs identical
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E076-leg-demo")
+OUT = os.path.expanduser(_ART + "/E076-leg-demo")
 
 
 def curve():

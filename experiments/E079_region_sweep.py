@@ -4,6 +4,7 @@ Panel B (compound demo): (theta x pull) grid at fixed W=80/h=0.25, policies = co
 Per cell: fail fraction = tip (fell_over) OR slam (> 80+1.3W). One env build per (config,policy); cells via reset.
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -75,6 +76,6 @@ if __name__ == "__main__":
     res["w_rest"] = sweep("go2_weight_rest_hi_at_0", CK["w_rest"], cellsW, False)
     res["c_stand"] = sweep("go2_compound_rest_at_100", CK["c_stand"], cellsT, True)
     res["c_rest"] = sweep("go2_compound_rest_at_100", CK["c_rest"], cellsT, True)
-    out = os.path.expanduser("~/artifacts/odd-conditioned/E077-figures")
+    out = os.path.expanduser(_ART + "/E077-figures")
     json.dump({"WS": WS, "THS": THS, "PULLS": PULLS, "res": res}, open(f"{out}/F2_grid.json", "w"), indent=2)
     print("saved ->", f"{out}/F2_grid.json")

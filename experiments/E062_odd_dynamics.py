@@ -11,6 +11,7 @@ Question: is conditioning's edge robust across change shapes (it is told live θ
 how gradual/inferable the change is? Reports survival(t) traces + final survival & slam per (schedule, arm).
 """
 import os, sys, io, contextlib, math
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 import numpy as np
@@ -85,7 +86,7 @@ if __name__ == "__main__":
             row.append(f"surv={fs:.2f} slam={sl:.2f}")
         print(f"{sched:9s} " + " ".join(f"{c:>22}" for c in row))
 
-    out = os.path.expanduser("~/artifacts/odd-conditioned/E062-odd-dynamics")
+    out = os.path.expanduser(_ART + "/E062-odd-dynamics")
     os.makedirs(out, exist_ok=True)
     data = {"steps": STEPS, "t0": T0, "dt": DT, "sched": np.array(SCHED)}
     for s in SCHED:

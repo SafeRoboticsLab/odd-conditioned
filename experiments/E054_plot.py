@@ -1,9 +1,10 @@
 """Plot the E054 payoff figure: survival vs FR-torque, specialists (frontier) + blind/conditioned/history."""
 import json, os
+from _paths import _ART
 import matplotlib; matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-out = os.path.expanduser("~/artifacts/odd-conditioned/E054-conditioned-eval")
+out = os.path.expanduser(_ART + "/E054-conditioned-eval")
 d = json.load(open(f"{out}/results.json"))
 forces = sorted({float(k.split("|")[0]) for k in d})
 pcts = [100, 70, 50, 30, 20, 10]

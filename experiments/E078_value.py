@@ -11,6 +11,7 @@ band (θ≥0.5) and the FAILED band (θ≤0.2). Compare to flat leg (0.18) and w
 and monotone-ish → contracts → pick eps and PROCEED to the handoff. If flat → STOP, report loudly.
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -29,7 +30,7 @@ W, LOAD_H = 80.0, 0.25
 STAND = "results/go2_compound_runs/go2_compound_stand_adv/checkpoints/model_49999872_steps.zip"
 PULL = th.tensor([0., 1., 0.])
 TASK = "go2_compound_rest"                          # common surface (θ+W driven per step); actor obs identical
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E078-compound-demo")
+OUT = os.path.expanduser(_ART + "/E078-compound-demo")
 REF = dict(flat_leg=0.18, weight=1.16)             # E076 (unloaded leg, FLAT) / E075 (weight, contracts)
 
 

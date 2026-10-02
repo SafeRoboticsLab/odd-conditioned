@@ -21,6 +21,7 @@ READ: conditioned/history should hug the LOWER ENVELOPE of the specialists (matc
 each θ) while blind sits ABOVE (pays the worst-case tax). That is the value of ODD-conditioning.
 """
 import os, sys, json
+from _paths import _ART
 os.environ.setdefault("MUJOCO_GL", "egl")
 import torch as th
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -83,7 +84,7 @@ if __name__ == "__main__":
                 except Exception as e:
                     cells.append(f"ERR {type(e).__name__}")
             print(f"{p:>4} | " + " | ".join(f"{c:^18}" for c in cells))
-    out = os.path.expanduser("~/artifacts/odd-conditioned/E054-conditioned-eval")
+    out = os.path.expanduser(_ART + "/E054-conditioned-eval")
     os.makedirs(out, exist_ok=True)
     json.dump({f"{k[0]}|{k[1]}|{k[2]}": v for k, v in results.items()}, open(f"{out}/results.json", "w"), indent=2)
     print(f"\nsaved -> {out}/results.json")

@@ -5,6 +5,7 @@ up = EMA(V_stand)>EPS_UP for K_UP steps (calibrated on prone states, probe E080-
 switch (anti-chatter). Arms: BIDIR (ours) / ONE-WAY (first descent permanent) / STAND-ONLY / REST-ONLY.
 """
 import os, sys, io, contextlib, json, math
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
@@ -110,7 +111,7 @@ if __name__ == "__main__":
             out[f"{sched}|{arm}"] = {"metrics": r, "traces": tr if arm == "BIDIR" else None}
             print(f"{arm:>10} {r['mode_track_feas']:>8.2f} {r['mode_track_infeas']:>11.2f} "
                   f"{r['recovered_avail']:>9.2f} {r['tip']:>5.2f} {r['slam']:>5.2f} {r['switches']:>8.1f}")
-    od = os.path.expanduser("~/artifacts/odd-conditioned/E080-bidirectional")
+    od = os.path.expanduser(_ART + "/E080-bidirectional")
     os.makedirs(od, exist_ok=True)
     json.dump(out, open(f"{od}/results.json", "w"))
     print(f"\nsaved -> {od}/results.json")

@@ -10,6 +10,7 @@ Under the RECAL stand policy at pull 10N, warm ~150 steps at each fixed W, then 
 reach-avoid value at the state). W ∈ {0,30,60,90,120,150,200}. Same high-CoM physics as E074.
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -28,7 +29,7 @@ RECAL = "results/go2_weight_runs/E075_recal/go2_weight_stand_hi_adv/checkpoints/
 # E074's noisy stand_hi, for a same-state discrimination comparison:
 E074_STAND = "results/go2_weight_runs/go2_weight_stand_hi_adv/checkpoints/model_49999872_steps.zip"
 TASK = "go2_weight_rest_hi_at_0"
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E075-recal-eval")
+OUT = os.path.expanduser(_ART + "/E075-recal-eval")
 
 
 def curve():

@@ -9,12 +9,14 @@ Arms: V2 (dedicated descend), V2-REUSE (rest_hi as descend), V1 (batch-1 bidir),
 Records: survival S(t), affordance while alive, and DEATH FORENSICS (automaton state at death).
 """
 import os, sys, io, contextlib, json, math
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
 import numpy as np
 from robot_safety_sandbox import make_tensor, spec
 from robot_safety_sandbox.eval.policies import load_twin
+from E084_automaton import load_twins
 
 DEV, N, DT, STEPS = "cuda:0", 256, 0.02, 1000
 EPS_DN, K_DN = 0.02, 5          # earlier: descend while V_stand merely DEGRADING
@@ -70,7 +72,7 @@ def value_of(env, model, norm):
 def rollout(sched, cond, arm):
     with contextlib.redirect_stdout(io.StringIO()):
         env = make_tensor("go2_weight_rest_hi_at_0", N, DEV, adversary=True)
-        tw = {k: load_twin(v, DEV, quiet=True) for k, v in CK.items() if os.path.exists(v)}
+        tw = load_twins(CK, DEV)
     inner = env.mj
     dstb = th.zeros(N, spec("go2_weight_rest_hi_at_0").dstb_dim, device=DEV); dstb[:, 1] = 1.0
     obs = env.reset()
@@ -179,7 +181,7 @@ if __name__ == "__main__":
                 out[f"{cond}|{sched}|{arm}"] = r
                 dd = " ".join(f"{k}:{v}" for k, v in r["deaths"].items() if v)
                 print(f"{arm:>10} {r['final']:>7.2f} {r['afford_alive']:>12.2f}  {dd}")
-    od = os.path.expanduser("~/artifacts/odd-conditioned/E084-automaton")
+    od = os.path.expanduser(_ART + "/E084-automaton")
     os.makedirs(od, exist_ok=True)
     json.dump(out, open(f"{od}/results_early.json", "w"))
     print(f"\nsaved -> {od}/results.json")

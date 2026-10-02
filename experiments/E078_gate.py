@@ -17,6 +17,7 @@ UNLOADED leg-at-stance case E076 where stand held to θ=0.1) AND descent stays g
 If the LOADED stand STILL holds to θ≤0.1 → KILL (the compound axis is reactively absorbable too).
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -34,7 +35,7 @@ AMBIENT, GUST = 0.20, 0.70                          # 10 N ambient pull / 35 N (
 PULL = th.tensor([0., 1., 0.])
 TASK = "go2_weight_rest_hi_at_0"                    # permissive common cfg; W + θ driven per step
 STAND_CK = "results/go2_weight_runs/E075_recal/go2_weight_stand_hi_adv/checkpoints/model_49999872_steps.zip"
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E078-compound-gate")
+OUT = os.path.expanduser(_ART + "/E078-compound-gate")
 
 # scripted DEEP fold (E069b) in action space: [hips(4), thighs(4), calves(4)] offsets from default pose
 FOLD_HIP, FOLD_TH, FOLD_CA = 0.0, 0.35, -0.45

@@ -10,6 +10,7 @@ contracts across eps, V_unified stays flat/rising = no handoff signal); bottom =
 mode-switch annotation, gust bands, and STAND-ONLY's tip visible (height crashing at a high-W gust).
 """
 import os, sys, io, contextlib, mujoco
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -41,7 +42,7 @@ POL = {"STAND-ONLY": ("stand_hi", "stand_hi", "none"), "REST-ONLY": ("rest_hi", 
 COL = {"STAND-ONLY": "#e74c3c", "HANDOFF": "#1a5276", "UNIFIED": "#8e44ad",
        "UNIFIED-DISC": "#d68910", "REST-ONLY": "#27ae60"}
 GRAY, RED, BLUE = np.array([0.5, 0.5, 0.5, 1.]), np.array([0.85, 0.10, 0.10, 1.]), np.array([0.15, 0.35, 0.9, 1.])
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E074-hicom-demo")
+OUT = os.path.expanduser(_ART + "/E074-hicom-demo")
 
 
 def W_of(t):

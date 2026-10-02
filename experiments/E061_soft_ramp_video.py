@@ -4,6 +4,7 @@ Side-by-side robot grids for BLIND | HISTORY | CONDITIONED (converged 50M), with
 while CONDITIONED (told θ) stays up — the value-of-information ordering, made visible.
 """
 import os, sys
+from _paths import _ART
 os.environ.setdefault("MUJOCO_GL", "egl")
 import numpy as np, torch as th, imageio.v2 as imageio
 import matplotlib; matplotlib.use("Agg")
@@ -103,8 +104,8 @@ def make_video(theta_lo, fr, label):
            for i in range(STEPS)]
     TW = top[0].shape[1]; GH = 320
     comb = [np.vstack([top[i], graph_frame(fracs, i, TW, GH, theta_lo)[:GH, :TW]]) for i in range(STEPS)]
-    os.makedirs(os.path.expanduser("~/artifacts/odd-conditioned/E060-soft-ramp"), exist_ok=True)
-    out = os.path.expanduser(f"~/artifacts/odd-conditioned/E060-soft-ramp/{label}.mp4")
+    os.makedirs(os.path.expanduser(_ART + "/E060-soft-ramp"), exist_ok=True)
+    out = os.path.expanduser(_ART + f"/E060-soft-ramp/{label}.mp4")
     imageio.mimsave(out, comb, fps=30, macro_block_size=1)
     print(f"  wrote {out} ({len(comb)} frames, {comb[0].shape[1]}x{comb[0].shape[0]})")
 

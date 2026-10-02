@@ -9,6 +9,7 @@ Arms: V2 (dedicated descend), V2-REUSE (rest_hi as descend), V1 (batch-1 bidir),
 Records: survival S(t), affordance while alive, and DEATH FORENSICS (automaton state at death).
 """
 import os, sys, io, contextlib, json, math
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
@@ -21,8 +22,8 @@ EPS_DN, K_DN = -0.05, 5
 EPS_UP, K_UP = 0.10, 15   # 0.02 let W=220 prone states fire get-up (E086 diag: 96 mid-pulse attempts, 98 aborts)
 EPS_ABORT, K_ABORT = -0.02, 10
 REFRACT, ALPHA = 50, 0.1
-WARMUP = 50
-UP_W_GATE = None                # if set: get-up allowed only while the ODD estimate W < gate (belief-gated return)                     # no triggers during the spawn transient (E086 diag: EMA-from-0 dips fired descents at W=40)
+WARMUP = 50                     # no triggers during the spawn transient (E086 diag: EMA-from-0 dips fired descents at W=40)
+UP_W_GATE = None                # if set: get-up allowed only while the ODD estimate W < gate (belief-gated return; E086 sets 130)
 CK = {
     "stand": "results/go2_weight_runs/E075_recal/go2_weight_stand_hi_adv/checkpoints/model_49999872_steps.zip",
     "rest": "results/go2_weight_runs/go2_weight_rest_hi_adv/checkpoints/model_49999872_steps.zip",
@@ -30,6 +31,17 @@ CK = {
     "descend": "results/go2_transition_runs/descend_v4/go2_descend_adv/checkpoints/model_49999872_steps.zip",
 }
 STATES = ["STAND", "DESCENDING", "REST", "GETTINGUP"]
+
+
+def load_twins(ck=None, dev=DEV):
+    """Load every twin in ``ck`` (default CK). A missing checkpoint is an ERROR: silently skipping one
+    (the old ``if os.path.exists`` pattern) would e.g. turn arm V2 into V2-REUSE without a word."""
+    ck = CK if ck is None else ck
+    missing = [v for v in ck.values() if not os.path.exists(v)]
+    if missing:
+        raise SystemExit("missing checkpoints — run `bash scripts/fetch_bundles.sh` from the repo root:\n  "
+                         + "\n  ".join(missing))
+    return {k: load_twin(v, dev, quiet=True) for k, v in ck.items()}
 
 
 def W_of(sched, t):
@@ -71,7 +83,7 @@ def value_of(env, model, norm):
 def rollout(sched, cond, arm):
     with contextlib.redirect_stdout(io.StringIO()):
         env = make_tensor("go2_weight_rest_hi_at_0", N, DEV, adversary=True)
-        tw = {k: load_twin(v, DEV, quiet=True) for k, v in CK.items() if os.path.exists(v)}
+        tw = load_twins()
     inner = env.mj
     inner.cfg.episode_length_s = 10_000.0   # kill the 20s timeout: no free mid-eval resets (Buzi's catch)
     dstb = th.zeros(N, spec("go2_weight_rest_hi_at_0").dstb_dim, device=DEV); dstb[:, 1] = 1.0
@@ -176,7 +188,7 @@ if __name__ == "__main__":
                 out[f"{cond}|{sched}|{arm}"] = r
                 dd = " ".join(f"{k}:{v}" for k, v in r["deaths"].items() if v)
                 print(f"{arm:>10} {r['final']:>7.2f} {r['afford_alive']:>12.2f}  {dd}")
-    od = os.path.expanduser("~/artifacts/odd-conditioned/E084-automaton")
+    od = os.path.expanduser(_ART + "/E084-automaton")
     os.makedirs(od, exist_ok=True)
     json.dump(out, open(f"{od}/results.json", "w"))
     print(f"\nsaved -> {od}/results.json")

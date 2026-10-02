@@ -9,10 +9,11 @@ Run per-table per-rep in SEPARATE processes (the single-excursion module patches
   python3 E094_seeds.py --aggregate                           -> seeds_summary.json + markdown table
 """
 import os, sys, json, argparse
+from _paths import _ART
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
 os.environ.setdefault("MUJOCO_GL", "egl")
 
-ART = os.path.expanduser("~/artifacts/odd-conditioned")
+ART = os.path.expanduser(_ART)
 SEEDDIR = f"{ART}/PAPER-draft/seeds"
 ARMS_W = ["WALK-ONLY", "REST-ONLY", "ONE-WAY", "V1", "V2"]
 ARMS_S = ["V2", "V1", "ONE-WAY", "STAND-ONLY", "REST-ONLY"]

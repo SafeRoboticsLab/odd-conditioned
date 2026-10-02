@@ -16,6 +16,7 @@ Reads: (a) stand_hi's TRUE feasible band under gusts; (b) does unified_hi ALWAYS
 the lexicographic finding); (c) unified_disc_hi's hedge profile (stands where? tips doing so?).
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -31,7 +32,7 @@ AMBIENT, GUST = 0.20, 0.70                          # 10N ambient / 35N (10+25 g
 PULL = th.tensor([0., 1., 0.])
 CK = "results/go2_weight_runs/go2_weight_{m}_adv/checkpoints/model_49999872_steps.zip"
 TASK = "go2_weight_rest_hi_at_0"                    # permissive common cfg; W driven per step
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E074-hicom-demo")
+OUT = os.path.expanduser(_ART + "/E074-hicom-demo")
 
 
 def cell(policy_m, W):

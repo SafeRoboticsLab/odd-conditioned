@@ -10,6 +10,7 @@ t=7s. FR leg (bodies 6,7,8) tints gray->RED as θ drops (E061 trick). Synced gra
 ε, base heights per arm, gust band.
 """
 import os, sys, io, contextlib, mujoco
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -43,7 +44,7 @@ TASK = "go2_leg_rest"
 PANELS = ["STAND-ONLY", "REST-ONLY"]
 POL = {"STAND-ONLY": LEG_STAND, "REST-ONLY": LEG_REST}
 COL = {"STAND-ONLY": "#e74c3c", "REST-ONLY": "#27ae60"}
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E076-leg-demo")
+OUT = os.path.expanduser(_ART + "/E076-leg-demo")
 
 
 def theta_of(t):

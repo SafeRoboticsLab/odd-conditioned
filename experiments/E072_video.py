@@ -7,6 +7,7 @@ Figure: standalone timeline (W(t), V_stand contraction crossing eps, heights, sw
 "weight increase and mode switch" story in one plot.
 """
 import os, sys, io, contextlib, mujoco
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -163,7 +164,7 @@ if __name__ == "__main__":
         data[arm] = {"h": h128, "V": V128, "swf": swf128, "switch_t": st}
         print(f"{arm}: h_end={h128[-1]:.2f} switched={float((st>=0).mean() if len(st) else 0):.2f}"
               f" medianW@switch={W_of(int(np.median(st[st>=0])/DT)) if (st>=0).any() else float('nan'):.0f}N")
-    out_dir = os.path.expanduser("~/artifacts/odd-conditioned/E071-handoff")
+    out_dir = os.path.expanduser(_ART + "/E071-handoff")
     os.makedirs(out_dir, exist_ok=True)
     H, Wd = grids["STAND-ONLY"][0].shape[:2]
     top = [np.hstack([tag(grids[a][i][:H, :Wd], f"{a}") for a in ARMS]) for i in range(STEPS)]

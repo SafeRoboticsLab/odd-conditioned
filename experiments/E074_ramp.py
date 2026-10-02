@@ -17,6 +17,7 @@ Success signature: HANDOFF survives the early low-W gust STANDING, switches befo
 tip; STAND-ONLY tips at the mid/high-W gusts; UNIFIED lazy-descends; UNIFIED-DISC hedges.
 """
 import os, sys, io, contextlib, json
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -38,7 +39,7 @@ EPS, HYST, ALPHA, SETTLE = -0.04, 8, 0.10, 130
 PULL = th.tensor([0., 1., 0.])
 CK = "results/go2_weight_runs/go2_weight_{m}_adv/checkpoints/model_49999872_steps.zip"
 TASK = "go2_weight_rest_hi_at_0"
-OUT = os.path.expanduser("~/artifacts/odd-conditioned/E074-hicom-demo")
+OUT = os.path.expanduser(_ART + "/E074-hicom-demo")
 
 # arm -> (stand-phase policy, rest-phase policy, switch rule). "V"=value trigger, "none"=stay stand policy,
 # "all"=stay rest policy from t=0.

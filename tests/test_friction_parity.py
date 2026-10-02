@@ -79,7 +79,11 @@ def test_gym_contract_and_modes():
 def test_grid_optimal_rollout_parity():
     """Roll the E011 grid-optimal policy IN the env; outcomes must match E012's standalone rollout
     (dynamics parity end-to-end): (0.8,0,+x,4.0) reaches at μ=1.0, crashes at μ=0.1."""
-    d = np.load("results/E011_v6/gate.npz")
+    gate = "results/E011_v6/gate.npz"            # produced by experiments/E011_friction_grid_gate.py
+    if not os.path.exists(gate):
+        import pytest
+        pytest.skip(f"{gate} not present (regenerate with experiments/E011_friction_grid_gate.py)")
+    d = np.load(gate)
     grid = E.Grid4(len(d["x"]), len(d["y"]), len(d["psi"]), len(d["v"]))
     gg, ll = E.margins(grid)
     outcomes = {}
@@ -94,7 +98,7 @@ def test_grid_optimal_rollout_parity():
             cands = []
             for a_l, k in E.controls(np.array(s[3]), mu):
                 sn = FB.step_state(s, float(a_l), float(k))
-                vn = float(grid.interp(V, *[np.array([q]) for q in sn]))
+                vn = float(np.ravel(grid.interp(V, *[np.array([q]) for q in sn]))[0])
                 dg = float(np.hypot(sn[0] - FB.GOAL[0], sn[1] - FB.GOAL[1]))
                 cands.append((vn, dg, float(k), float(a_l)))
             bV = max(c[0] for c in cands)

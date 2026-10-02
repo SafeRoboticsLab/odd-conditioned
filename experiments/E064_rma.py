@@ -12,6 +12,7 @@ If φ LAGS (δ*>0 costs safety during the window), a fast/sound belief is what c
 Usage: python experiments/E064_rma.py --seed 0
 """
 import os, sys, io, contextlib, argparse
+from _paths import _ART
 import torch as th, torch.nn as nn
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -152,7 +153,7 @@ if __name__ == "__main__":
             s, sl, ds = eval_ramp(model, norm, phi, fr, mode)
             out[f"{int(fr*50)}N|{mode}"] = [s, sl, ds]
             print(f"  {int(fr*50)}N {mode:8s} surv={s:.2f} slam={sl:.2f}" + (f" δ*={ds:.2f}s" if mode == "rma" else ""))
-    od = os.path.expanduser("~/artifacts/odd-conditioned/E064-fair-fight")
+    od = os.path.expanduser(_ART + "/E064-fair-fight")
     os.makedirs(od, exist_ok=True)
     import json; json.dump(out, open(f"{od}/rma_seed{a.seed}.json", "w"), indent=2)
     print(f"saved -> {od}/rma_seed{a.seed}.json")

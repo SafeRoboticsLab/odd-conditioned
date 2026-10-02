@@ -2,6 +2,7 @@
 makes the 20% figure (θ_lo=0.2, 15/25N) and the 10% figure (θ_lo=0.1, 0/10N). Soft-rest scoring; converged 50M.
 """
 import os, sys, io, contextlib, argparse
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox")
@@ -78,5 +79,5 @@ if __name__ == "__main__":
     fig.suptitle(f"Value of ODD-conditioning — FR leg dies mid-episode (θ 1.0→{a.theta_lo}"
                  f"{' , OOD' if ood else ''}), soft-rest, CONVERGED\n{sub}", fontsize=12)
     fig.tight_layout()
-    out = os.path.expanduser(f"~/artifacts/odd-conditioned/E060-soft-ramp/value_of_conditioning_{a.tag}.png")
+    out = os.path.expanduser(_ART + f"/E060-soft-ramp/value_of_conditioning_{a.tag}.png")
     fig.savefig(out, dpi=130, bbox_inches="tight"); print("saved", out)

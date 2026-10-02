@@ -1,9 +1,14 @@
 """E089 — WALKING WITH THE SAFETY FILTER (Buzi's final experiment set).
 
-Task: walk from spawn to a goal GOAL_D m ahead (success = within GOAL_R while alive) on a 24 s horizon,
-while the ODD parameter W follows a single excursion starting/ending at ZERO weight:
-    pulse : W = 0, jumps to 220 N for t in [8,16) s, back to 0
-    period: W = 110 - 110*cos(2*pi*t/24)  (0 -> 220 -> 0)
+Task: walk from spawn to a goal GOAL_D = 12 m ahead (success = within GOAL_R while alive) on a 30 s horizon,
+while the ODD parameter W follows a single excursion starting/ending at ZERO weight (E089v2 protocol):
+    pulse : W = 0, jumps to 220 N for t in [5,13) s, back to 0
+    period: W = 220 * sin^2(pi*(t-5)/8) for t in [5,13) s, else 0
+Pre-excursion reach is ~4.2 m, so only post-excursion RESUMPTION can score. Conditions benign / medium /
+gusty. RESULT (boundary finding): every walking arm ends safe <= ~0.05 — the load-naive walker cannot carry
+220 N at h=0.25, and settling under peak load from a gait flips robots. The earlier 9 m-goal protocol looked
+positive only because robots finished before the load arrived. The walking demonstration that works is
+E092 (payload swap with a W=0 light phase, belief trigger, brake handoff).
 The nominal policy is the weight-NAIVE joystick walker from safe_mjlab_zoo (go2_walker_flat, via the
 go2_atomic_skills extracted actor+norm; 47-d obs rebuilt here batched). The safety filter owns the weight:
 value-based filtering — walker runs while V̄_stand is healthy; collapse => certified descent -> rest;
@@ -18,15 +23,16 @@ Modes: --cal (calibrate EPS_DN on walking states: V̄_stand distributions at W=0
        --smoke (16-env walker-only sanity: displacement at W=0).
 """
 import os, sys, io, math, json, contextlib, argparse
+from _paths import _ART
 import torch as th
 os.environ.setdefault("MUJOCO_GL", "egl")
 sys.path.insert(0, "external/robot-safety-sandbox"); sys.path.insert(0, "experiments")
-sys.path.insert(0, "/home/buzi/Desktop/RESEARCH/SAFE/DEVELOPMENT/go2_atomic_skills")
+sys.path.insert(0, "external/go2_atomic_skills")
 import numpy as np
 from robot_safety_sandbox import make_tensor, spec
 from robot_safety_sandbox.eval.policies import load_twin
 import E084_automaton as E
-from E084_automaton import (CK, value_of, in_rest_target, in_stance_target,
+from E084_automaton import (CK, load_twins, value_of, in_rest_target, in_stance_target,
                             EPS_UP, K_UP, EPS_ABORT, K_ABORT, REFRACT, ALPHA, K_DN, WARMUP)
 from go2_atomic_skills.nets import WalkerNorm, load_actor
 from go2_atomic_skills.obs import DEFAULT_JOINT_POS, CTRL_GAIN, WALK_PHASE_PERIOD, PHASE_STAND_EPS
@@ -112,7 +118,7 @@ def rollout(sched, cond, arm, n=N, cal=False, record=False, render=False):
         if render:
             try: env.mj.cfg.viewer.max_extra_envs = n - 1
             except Exception: pass
-        tw = {k: load_twin(v, DEV, quiet=True) for k, v in CK.items() if os.path.exists(v)}
+        tw = load_twins()
     inner = env.mj
     inner.cfg.episode_length_s = 10_000.0      # no free timeout resets
     if LOOSE_TERM:
@@ -293,7 +299,7 @@ if __name__ == "__main__":
                 dd = " ".join(f"{k}:{v}" for k, v in r["deaths"].items() if v)
                 tgs = f"{r['t_goal_med']:.1f}s" if r["t_goal_med"] else "--"
                 print(f"{arm:>10} {r['success']:>8.2f} {r['safe']:>6.2f} {tgs:>7}  {dd}", flush=True)
-    od = os.path.expanduser("~/artifacts/odd-conditioned/E089-goal-walk")
+    od = os.path.expanduser(_ART + "/E089-goal-walk")
     os.makedirs(od, exist_ok=True)
     json.dump(out, open(f"{od}/results.json", "w"))
     print(f"\nsaved -> {od}/results.json", flush=True)
