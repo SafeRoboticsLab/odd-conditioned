@@ -9,6 +9,17 @@ what has to be true before it moves between modes. Everything below is read off 
 
 Control runs at **50 Hz** (`DT = 0.02 s`), so "K steps" below means K × 20 ms.
 
+## 0. Two constructions in this repo — don't mix them up
+
+1. **One-way handoff (E071–E079, the certificate demos).** Two policies per ODD family — a STAND expert and
+   a REST expert — and a single switch: when the STAND certificate collapses, hand the robot to the REST
+   expert and never come back. No transition policies. This is what the weight-ladder (E071/E074/E075),
+   leg-family (E076) and compound (E078) demos run, each with its own stand/rest pair (`go2_weight_*`,
+   `go2_leg_*`, `go2_compound_*`). It answers "does the certificate know when to give up standing?"
+2. **The certified automaton (E080 on, the paper's system).** Two **modes** (STAND/WALK, REST) plus two
+   **transitions** (descend, get up), each transition its own trained reach-avoid policy, so the robot can
+   go down *and come back up* as the ODD changes. The rest of this page is about this construction.
+
 ## 1. The modes and their experts
 
 | state | runs | trained artifact (checkpoint under `results/`) | its certificate |
@@ -23,7 +34,31 @@ Control runs at **50 Hz** (`DT = 0.02 s`), so "K steps" below means K × 20 ms.
 Each expert is a two-player (control vs. adversarial push) reach-avoid PPO twin (`ReachAvoidPPO2P`). Its
 value net gives `V(s) ≥ 0` ⇔ "this mode's spec is (estimated) still satisfiable from here". The runtime
 reads it as `V = model.policy.predict_values(norm(obs))` on the 48-d actor observation (helper:
-`value_of` in E084, `experiments/_value_util.py`).
+`value_of` in E084, `experiments/_value_util.py`). All four twins also observe the carried load W
+(the 48th observation), so their policies and certificates are load-aware. How the two transition funnels
+are built (start states, targets, warm-starts): [TRAINING.md §4](TRAINING.md#the-two-transition-funnels).
+
+### Which policy drives which state, per experiment
+
+The checkpoints are trained once and shared: every automaton experiment loads the same `CK` dict from
+`experiments/E084_automaton.py`. What differs is which of them each experiment uses where.
+
+| experiment / arm | STAND or WALK | BRAKE | DESCENDING | REST | GETTINGUP | values that decide switches |
+|---|---|---|---|---|---|---|
+| **E084/E086 standing, V2** | stand_hi | — | descend_v4 | rest_hi | getup_v2 | `V_stand` (descent trigger), `V_up` (return + abort) |
+| E084/E086 standing, V2-REUSE | stand_hi | — | rest_hi | rest_hi | getup_v2 | same |
+| **E092 payload walk, V2** | walker | stand_hi | descend_v4 | rest_hi | getup_v2 | `V_up` only (descent trigger = load belief W ≥ 60 N) |
+| E091 leg-fault walk, V2-REUSE | walker | walker, zero command | rest_hi | rest_hi | getup_v2 | `V_up` only (descent trigger = torque-saturation residual) |
+| E089 weight walk, V2-REUSE | walker | — | rest_hi | rest_hi | getup_v2 | `V_stand` (descent trigger), `V_up` |
+| V1 / ONE-WAY (any experiment) | stand_hi or walker | as V2 in E091/E092 | rest_hi | rest_hi | — (V1 hands straight back to the stand/walk policy) | descent: that experiment's V2 trigger · V1 return: `V_stand` read while lying down |
+
+So standing V2 runs exactly four safety policies (STAND, REST, and one reach-avoid policy per transition
+direction); walking V2 in E092 adds the walker as the task policy, with stand_hi reused as the brake.
+
+**E091 reuses the weight-trained safety policies for a leg fault.** rest_hi and getup_v2 were trained with
+a carried load and a healthy leg, never with a derated one; E091 runs them at W = 0. It works because the
+robot lies down on the weak leg and only gets up after the leg has recovered (the return gate requires
+θ ≥ 0.99). The leg-specific experts (`go2_leg_*`, `go2_compound_*`) belong to the one-way demos of §0 only.
 
 ## 2. Signal conditioning (shared by every automaton)
 

@@ -117,6 +117,31 @@ per step through `env.base_load` (plus `env.mj._weight_W` / `_weight_h`). ODD ob
 The automaton evaluations all run in the `go2_weight_rest_hi_at_0` env with W driven per step, so a "death" there
 is `fell_over` (70°, or 80° under E092's loose criterion) or a non-foot contact above a flat 500 N.
 
+### The two transition funnels
+
+The automaton's transitions are policies in their own right — the robot does not simply switch from the stand
+expert to the rest expert and hope. Each funnel is the same kind of reach-avoid twin as the mode experts (same
+recipe, same adversary, observes W); it differs from them only in **where its training episodes start** and
+**which target it must reach**. The safety condition g is the rest mode's load-scaled no-slam rule for both.
+Code: `external/robot-safety-sandbox/robot_safety_sandbox/envs/go2_transitions/env_cfg.py`.
+
+| | get-up funnel (`go2_getup` → getup_v2) | descent funnel (`go2_descend` → descend_v4) |
+|---|---|---|
+| job | lying down → stable stand | standing → settled rest |
+| episodes start | lying down (`reset_prone`): base 0.09–0.13 m, roll/pitch ±0.15 rad, any heading, legs folded (thigh 0.3–1.8, calf −2.75 to −1.85, hip ±0.9 rad — the ranges measured on the rest poses the automaton actually produces) | standing but disturbed: roll/pitch ±0.15 rad, lateral velocity ±0.3 m/s |
+| loads | W ∈ [0, 160] N, CoM 0.25 m up | W ∈ [80, 260] N (heavy only), CoM 0.25 m up |
+| target l | the full stance target, which it must **reach and hold** — episodes end only on failure, never on reaching | the full rest target (low, level, settled) |
+| warm-start | getup v1 (same task, narrower start ranges) | the rest expert rest_hi |
+| its value in the automaton | `V_up`: the return certificate (fire the get-up) and the abort signal | not used (explained variance −0.805; only the policy is used) |
+
+Two consequences shape the automaton:
+
+- **A funnel is only trustworthy from inside its training start set.** The descent funnel never saw a walking
+  gait, so walking automata first BRAKE (stance expert stops the robot) and only then descend. The get-up
+  funnel never saw loads above 160 N, so the return waits for the load to clear.
+- **V2-REUSE skips the descent funnel** and descends with the rest expert; under the corrected accounting
+  the dedicated funnel is worth it (single benign/period 0.75 vs 0.50).
+
 ## 5. Which experiment loads which checkpoint
 
 Every path ends in `/checkpoints/model_49999872_steps.zip`. `CK` is the dict in `experiments/E084_automaton.py`
