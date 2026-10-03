@@ -52,6 +52,10 @@ def W_of(sched, t):
 
 
 def gust_scale(cond, t):
+    """Scripted eval push, as a fraction of force_max (50 N) in +y: benign = constant 10 N; gusty = 35 N for
+    0.5 s every 2 s; none = no push (the learned adversary is never used at evaluation)."""
+    if cond == "none":
+        return 0.0
     if cond == "benign":
         return 0.2
     return 0.7 if ((t * DT) % 2.0) < 0.5 else 0.2

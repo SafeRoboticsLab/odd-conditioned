@@ -48,6 +48,7 @@ EPS_UP_LEG, EPS_ABORT_LEG = -0.35, -0.45   # V_up recalibrated on THIS regime's 
                                            # population median -0.27; certificates are ordinal off-distribution,
                                            # thresholds are per-regime calibration — belief gate carries the ODD decision
 W_COMPOUND = 30.0               # heavy enough to matter, light enough that a HEALTHY loaded walker is viable
+PUSH_SCALE = 0.2                # scripted constant +y push = PUSH_SCALE x 50 N (10 N); 0 = no push
 STATES = ["WALK", "DESCENDING", "REST", "GETTINGUP", "BRAKE"]
 
 
@@ -132,7 +133,7 @@ def rollout(cond, arm, n=N, cal=False, record=False, render=False, cal_up=False)
         inner.sim.model.actuator_forcerange[:, ids, :] = nom * float(theta)
         env.base_load = th.tensor([0., 0., -W], device=DEV)[None].expand(n, 3).contiguous()
         inner._weight_W[:] = W; inner._weight_h[:] = 0.25
-        env.force_scale = 0.2 * th.ones(n, device=DEV)
+        env.force_scale = PUSH_SCALE * th.ones(n, device=DEV)
         m_s, n_s = tw["stand"]; m_r, n_r = tw["rest"]
         Vs = value_of(env, m_s, n_s)
         vs_bar = Vs.clone() if t == 0 else (1 - ALPHA) * vs_bar + ALPHA * Vs

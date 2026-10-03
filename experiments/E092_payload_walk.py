@@ -41,6 +41,7 @@ UP_SUST = 100                          # belief DEBOUNCE: W must stay low 2s bef
 EPS_UP_92, EPS_ABORT_92 = -0.30, -0.45 # return certificate recalibrated on THIS regime's rest poses (ordinal use)
 EPS_DN_WALK, K_DN_WALK = -0.15, 10     # ROC-calibrated walking trigger
 UP_W_GATE = 130.0
+PUSH_SCALE = 0.2                       # scripted constant +y push = PUSH_SCALE x 50 N (10 N); 0 = no push
 STATES = ["WALK", "DESCENDING", "REST", "GETTINGUP", "BRAKE"]
 ARMS = ["WALK-ONLY", "REST-ONLY", "ONE-WAY", "V1", "V2"]
 
@@ -113,7 +114,7 @@ def rollout(sched, arm, n=N, record=False, render=False, cal_up=False):
         W, h = Wh_of(sched, t)
         env.base_load = th.tensor([0., 0., -W], device=DEV)[None].expand(n, 3).contiguous()
         inner._weight_W[:] = W; inner._weight_h[:] = h
-        env.force_scale = 0.2 * th.ones(n, device=DEV)
+        env.force_scale = PUSH_SCALE * th.ones(n, device=DEV)
         m_s, n_s = tw["stand"]; m_r, n_r = tw["rest"]
         Vs = value_of(env, m_s, n_s)
         vs_bar = Vs.clone() if t == 0 else (1 - ALPHA) * vs_bar + ALPHA * Vs
