@@ -126,7 +126,7 @@ def rollout(cond, arm, n=N, cal=False, record=False, render=False, cal_up=False)
         trunk = [gg for gg in range(mm.ngeom) if mm.geom_bodyid[gg] == base_id]
         GRAY = np.array([0.5, 0.5, 0.5, 1.0]); ORNG = np.array([0.95, 0.55, 0.1, 1.0])
         ST_COL = {1: np.array([0.90, 0.49, 0.13, 1.0]), 2: np.array([0.15, 0.35, 0.90, 1.0]),
-                  3: np.array([0.12, 0.52, 0.29, 1.0])}
+                  3: np.array([0.12, 0.52, 0.29, 1.0]), 4: np.array([0.95, 0.85, 0.2, 1.0])}   # 4 = BRAKE
     for t in range(STEPS):
         theta = theta_of(t)
         inner.sim.model.actuator_forcerange[:, ids, :] = nom * float(theta)
@@ -283,7 +283,7 @@ if __name__ == "__main__":
             import matplotlib; matplotlib.use("Agg")
             import matplotlib.pyplot as plt
             COL = {"WALK-ONLY": "#c0392b", "V1": "#8e44ad", "V2-REUSE": "#1a5276"}
-            STN = {0: "WALK", 1: "DESCENDING", 2: "REST", 3: "GETTING-UP"}
+            STN = {0: "WALK", 1: "DESCENDING", 2: "REST", 3: "GETTING-UP", 4: "BRAKING"}
             def gframe(i, W_, H_):
                 tt_ = np.arange(nfr) * 2 * DT
                 thv = np.array([theta_of(k * 2) for k in range(nfr)])
