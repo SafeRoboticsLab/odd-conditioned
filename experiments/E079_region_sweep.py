@@ -77,5 +77,6 @@ if __name__ == "__main__":
     res["c_stand"] = sweep("go2_compound_rest_at_100", CK["c_stand"], cellsT, True)
     res["c_rest"] = sweep("go2_compound_rest_at_100", CK["c_rest"], cellsT, True)
     out = os.path.expanduser(_ART + "/E077-figures")
+    os.makedirs(out, exist_ok=True)
     json.dump({"WS": WS, "THS": THS, "PULLS": PULLS, "res": res}, open(f"{out}/F2_grid.json", "w"), indent=2)
     print("saved ->", f"{out}/F2_grid.json")

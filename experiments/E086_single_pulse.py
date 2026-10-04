@@ -31,6 +31,7 @@ E.UP_W_GATE = 130.0; EV.UP_W_GATE = 130.0   # belief-gated return: only when W b
 
 if __name__ == "__main__":
     od = os.path.expanduser(_ART + "/E084-automaton")
+    os.makedirs(od, exist_ok=True)
     out = {}
     for cond in ("benign", "gusty"):
         for sched in ("pulse", "period"):

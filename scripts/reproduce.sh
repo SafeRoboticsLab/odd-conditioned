@@ -59,38 +59,49 @@ check_figure_inputs() {   # E093 re-plots from data: say which target produces a
   return $missing
 }
 
-[ $# -gt 0 ] || { sed -n 2,22p "$0"; exit 1; }
-for target in "$@"; do
-  case "$target" in
+run_target() {   # one target; its commands are chained so a failure stops that target only
+  case "$1" in
     smoke)    python -m pytest -q tests/ -W ignore ;;
     e092)     run e092 experiments/E092_payload_walk.py ;;
     e091)     run e091 experiments/E091_leg_walk.py ;;
     e089)     run e089 experiments/E089_goal_walk.py ;;
-    standing) run e084 experiments/E084_automaton.py
+    standing) run e084 experiments/E084_automaton.py &&
               run e086 experiments/E086_single_pulse.py ;;
     seeds)    for rep in 1 2 3; do
                 for table in e092 waves single; do
-                  run "e094_${table}_rep$rep" experiments/E094_seeds.py --table "$table" --rep "$rep"
+                  run "e094_${table}_rep$rep" experiments/E094_seeds.py --table "$table" --rep "$rep" || return 1
                 done
               done
               run e094_aggregate experiments/E094_seeds.py --aggregate ;;
     figures)  seed_reference
-              check_figure_inputs || exit 1
-              run e093 experiments/E093_figpolish.py ;;
-    compound) run e078_matrix experiments/E078_matrix.py
-              run e078_value experiments/E078_value.py
-              run e078_ramp experiments/E078_ramp.py
+              check_figure_inputs && run e093 experiments/E093_figpolish.py ;;
+    compound) run e078_matrix experiments/E078_matrix.py &&
+              run e078_value experiments/E078_value.py &&
+              run e078_ramp experiments/E078_ramp.py &&
               run e078_video experiments/E078_video.py ;;
     certificates)
-              run e079 experiments/E079_region_sweep.py
-              run e074_value experiments/E074_value.py
-              run e074_ramp experiments/E074_ramp.py
-              run e075_value experiments/E075_value.py
-              run e076_value experiments/E076_value.py
+              run e079 experiments/E079_region_sweep.py &&
+              run e074_value experiments/E074_value.py &&
+              run e074_ramp experiments/E074_ramp.py &&
+              run e075_value experiments/E075_value.py &&
+              run e076_value experiments/E076_value.py &&
               run e078_value experiments/E078_value.py ;;
-    videos)   run e092_videos experiments/E092_payload_walk.py --videos
+    videos)   run e092_videos experiments/E092_payload_walk.py --videos &&
               run e091_videos experiments/E091_leg_walk.py --videos ;;
-    *) echo "unknown target: $target" >&2; exit 2 ;;
+    *) echo "unknown target: $1" >&2; return 2 ;;
   esac
+}
+
+[ $# -gt 0 ] || { sed -n 2,22p "$0"; exit 1; }
+failed=()
+for target in "$@"; do
+  if ! run_target "$target"; then
+    echo "[repro] target '$target' FAILED — continuing with the rest" >&2
+    failed+=("$target")
+  fi
 done
+if [ ${#failed[@]} -gt 0 ]; then
+  echo "[repro] done with failures: ${failed[*]} (logs: $ODD_ARTIFACTS/logs/)" >&2
+  exit 1
+fi
 echo "[repro] done -> $ODD_ARTIFACTS"
