@@ -233,14 +233,15 @@ def claims_fig(sched, data, od):
                                   "Claim 2 — permissiveness (goal completions over time)")):
         ax2 = ax.twinx()
         ax2.fill_between(t, Wv, color="#777", alpha=0.10)
-        ax2.set_ylim(0, 900); ax2.set_yticks([40, 220]); ax2.tick_params(labelsize=7, colors="#777")
+        ax2.set_ylim(0, 900); ax2.set_yticks([W_TRIG, UP_W_GATE, W_HI]); ax2.tick_params(labelsize=7, colors="#777")
         for arm in ARMS:
             ax.plot(t, data[arm][key], color=COL[arm], lw=2.2 if arm == "V2" else 1.5,
                     label=f"{arm} ({data[arm][key][-1]:.2f})")
         ax.set_xlim(0, t[-1]); ax.set_ylim(0, 1.02); ax.grid(alpha=0.25)
         ax.set_xlabel("time (s)"); ax.set_ylabel(ylab); ax.set_title(title, fontsize=11)
         ax.legend(fontsize=8, loc="center right")
-    fig.suptitle(f"E092 payload-swap walking — {sched} (tall heavy payload W 40→220 N, CoM 0.25→0.40 m)", y=1.03)
+    fig.suptitle(f"E092 payload-swap walking — {sched} (tall heavy payload W {W_LO:.0f}→{W_HI:.0f} N, "
+                 f"CoM {H_LO:.2f}→{H_HI:.2f} m)", y=1.03)
     fig.tight_layout()
     fig.savefig(f"{od}/claims_{sched}.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -270,8 +271,9 @@ def topdown_fig(sched, data, od):
         ax.add_patch(plt.Circle((GOAL_D, 0), GOAL_R, fill=False, color="#1a5276", lw=2))
         ax.plot(0, 0, "k^", ms=8)
         nsucc = int(r["reached_mask"].sum()); nal = int(r["alive_mask"].sum())
-        ax.set_title(f"{arm}\nreached {nsucc}/256 | alive {nal}/256", fontsize=10)
-        ax.set_xlim(-2, 14.5); ax.set_ylim(-5, 5); ax.set_aspect("equal"); ax.grid(alpha=0.2)
+        n_all = len(r["reached_mask"])
+        ax.set_title(f"{arm}\nreached {nsucc}/{n_all} | alive {nal}/{n_all}", fontsize=10)
+        ax.set_xlim(-2, GOAL_D + 2.5); ax.set_ylim(-5, 5); ax.set_aspect("equal"); ax.grid(alpha=0.2)
         ax.set_xlabel("progress toward goal (m)")
     axes[0].set_ylabel("lateral (m)")
     fig.suptitle(f"E092 top-down — {sched} (green=reached, red=flipped at X, gray=alive short of goal)", y=1.04)
@@ -340,7 +342,7 @@ if __name__ == "__main__":
                 ax = fig.add_subplot(111); ax2 = ax.twinx()
                 ax2.fill_between(tt_, Wv, color="#777", alpha=0.12)
                 ax2.plot(tt_[:i + 1], Wv[:i + 1], color="#444", lw=1.6, label="payload W(t)")
-                ax2.set_ylim(0, 900); ax2.set_yticks([60, 130, 220]); ax2.set_ylabel("W (N)")
+                ax2.set_ylim(0, 900); ax2.set_yticks([W_TRIG, UP_W_GATE, W_HI]); ax2.set_ylabel("W (N)")
                 for arm in VARMS:
                     fr = fleet[f"{sched}|{arm}"]
                     S = np.array(fr["SUC"])[::2][:nfr]
@@ -350,7 +352,7 @@ if __name__ == "__main__":
                     ax.plot(tt_[:i + 1], A[:i + 1], color=COL[arm], lw=1.1, ls="--", alpha=0.7)
                 ax.axvline(tt_[i], color="#555", lw=1.5)
                 ax.set_xlim(0, tt_[-1]); ax.set_ylim(0, 1.05)
-                ax.set_xlabel("time (s)"); ax.set_ylabel("FLEET fraction (solid=reached, dashed=alive; N=256)")
+                ax.set_xlabel("time (s)"); ax.set_ylabel(f"FLEET fraction (solid=reached, dashed=alive; N={N})")
                 ax.legend(loc="upper left", fontsize=7); ax2.legend(loc="lower right", fontsize=7)
                 fig.tight_layout(pad=0.5); fig.canvas.draw()
                 buf = np.asarray(fig.canvas.buffer_rgba())[:, :, :3].copy(); plt.close(fig)

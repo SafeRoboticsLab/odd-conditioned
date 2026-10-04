@@ -292,7 +292,7 @@ if __name__ == "__main__":
                 ax = fig.add_subplot(111); ax2 = ax.twinx()
                 ax2.fill_between(tt_, thv, color="#e67e22", alpha=0.12)
                 ax2.plot(tt_[:i + 1], thv[:i + 1], color="#e67e22", lw=1.6, label="leg θ(t)")
-                ax2.set_ylim(0, 3.2); ax2.set_yticks([0.15, 1.0]); ax2.set_ylabel("θ", color="#e67e22")
+                ax2.set_ylim(0, 3.2); ax2.set_yticks([THETA_LO, 1.0]); ax2.set_ylabel("θ", color="#e67e22")
                 for arm in VARMS:
                     ax.plot(tt_, meds[arm], color=COL[arm], lw=1.0, alpha=0.25)
                     ax.plot(tt_[:i + 1], meds[arm][:i + 1], color=COL[arm], lw=2.2, label=arm)

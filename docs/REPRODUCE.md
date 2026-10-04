@@ -136,16 +136,18 @@ and §4.
 ## 6. Figures — E093 (paper F2, F3, F7, claims, top-downs, survival)
 
 ```bash
-bash scripts/reproduce.sh certificates e092 standing   # produce the data first (see §1, §4, §7)
+bash scripts/reproduce.sh certificates compound e092 standing   # produce the data first (§1, §4, §7, §8)
 bash scripts/reproduce.sh figures                      # ~1 min -> repro/E077-figures/, repro/PAPER-draft/figs/
 ```
 
-Re-plots the polished figures from on-disk data; it does not simulate. If an input is missing, the runner
-names the target that produces it.
+Re-plots the polished figures from on-disk data; it does not simulate. Every number drawn on a figure —
+handoff markers, gust positions, load levels, fleet sizes — is computed from those data files or from the
+producing script's protocol constants, so the figures stay correct for retrained policies. If an input is
+missing, the runner names the target that produces it.
 
 | figure | data it reads | produced by |
 |---|---|---|
-| F2 certifiable regions | `E077-figures/F2_grid.json` | E079 (`certificates` target) |
+| F2 certifiable regions | `E077-figures/F2_grid.json`; handoff markers from `E075-recal-eval/partA_ramp.json` and `E078-compound-demo/task3_ramp.json` | E079 + E075_ramp (`certificates`), E078_ramp (`compound`) |
 | F3 mode-ribbon timeline | `E074-hicom-demo/task3_ramp.json` | E074_ramp (`certificates`) |
 | F7 certificate contraction | `E074-hicom-demo/task2_value.json`, `E075-recal-eval/partA_value.json`, `E076-leg-demo/partB_value.json`, `E078-compound-demo/task2_value.json` | E074/E075/E076/E078 value sweeps (`certificates`) |
 | claims / top-down (walking) | `E092-payload-walk/results.json`, `traj_*.npz` | `e092` |

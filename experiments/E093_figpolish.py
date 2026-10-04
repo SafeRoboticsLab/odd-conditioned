@@ -8,7 +8,7 @@ F7 cross_demo          : σ-across-states bars swamped the means -> LEFT: means 
 F3 mode_ribbon         : audit y-limits from the DATA (no clipping), label the switch window, new names.
 Outputs overwrite $ODD_ARTIFACTS/E077-figures/ (default ~/artifacts/odd-conditioned) and copy into PAPER-draft/figs.
 """
-import os, json, shutil
+import os, sys, json, shutil
 from _paths import _ART
 import numpy as np
 import matplotlib; matplotlib.use("Agg")
@@ -24,6 +24,19 @@ ART = os.path.expanduser(_ART)
 OUT = f"{ART}/E077-figures"
 PD = f"{ART}/PAPER-draft/figs"
 SYS = "ODD-conditioned"
+FORCE_MAX = 50.0          # evaluation env force_max (N): a force_scale s is a lateral pull of s * FORCE_MAX
+
+# Every number drawn on a figure is computed here: protocol constants come from the script that ran the
+# experiment, statistics from its saved results. Nothing in this file states a result.
+
+
+def _path_at_gusts(mod, kind):
+    """ODD value at each gust start of a demo ramp (the spikes drawn on the demo path), from the ramp script."""
+    out = []
+    for g in mod.GUST_STARTS:
+        u = min(max((g - mod.RAMP_START) / (mod.RAMP_END - mod.RAMP_START), 0.0), 1.0)
+        out.append(mod.W_MAX * u if kind == "W" else mod.TH_HI + (mod.TH_LO - mod.TH_HI) * u)
+    return out
 
 
 def fig2():
@@ -36,26 +49,32 @@ def fig2():
 
     fw = grid(d["res"]["w_stand"], WS)
     fc = grid(d["res"]["c_stand"], THS)
+    # the two demo ramps: protocol from their scripts, handoff statistics from their results
+    import E075_ramp as RW, E078_ramp as RC
+    hw = json.load(open(f"{ART}/E075-recal-eval/partA_ramp.json"))["arms"]["HANDOFF(recal)"]
+    hc = json.load(open(f"{ART}/E078-compound-demo/task3_ramp.json"))["arms"]["HANDOFF"]
     fig, axes = plt.subplots(1, 2, figsize=(14.5, 6.2))
     cf = None
-    for ax, F, xs, xlab, title, sub, star, path_spikes in (
-        (axes[0], fw, WS, "carried load W (N)",
-         "Weight ladder: (W × disturbance) plane", "certified handoff at W ≈ 122 ± 64 N",
-         (122, 10), [125, 187, 250]),
-        (axes[1], fc, THS, "FR-leg torque fraction θ   (W = 80 N carried)",
-         "Compound: (θ × disturbance) plane", "certified handoff at θ ≈ 0.24",
-         (0.24, 10), []),
+    for ax, F, xs, xlab, title, sub, star_x, mod, kind in (
+        (axes[0], fw, WS, "carried load W (N)", "Weight ladder: (W × disturbance) plane",
+         f"certified handoff at W ≈ {hw['switchW_mean']:.0f} ± {hw['switchW_std']:.0f} N",
+         hw["switchW_mean"], RW, "W"),
+        (axes[1], fc, THS, f"FR-leg torque fraction θ   (W = {RC.W:.0f} N carried)",
+         "Compound: (θ × disturbance) plane",
+         f"certified handoff at θ ≈ {hc['switchTheta_mean']:.2f} ± {hc['switchTheta_std']:.2f}",
+         hc["switchTheta_mean"], RC, "theta"),
     ):
+        amb, gust = mod.AMBIENT * FORCE_MAX, mod.GUST_SCALE * FORCE_MAX
         cf = ax.contourf(xs, pn, F, levels=np.linspace(0, 1, 11), cmap="RdYlGn_r")
         ax.contour(xs, pn, F, levels=[0.2], colors="k", linewidths=2.6)
         both_bad = F > 0.8
         if both_bad.any():
             ax.contourf(xs, pn, both_bad.astype(float), levels=[0.5, 1.5],
                         colors="none", hatches=["////"])
-        ax.axhline(10, color="#1a5276", lw=2.0)
-        for wsp in path_spikes:
-            ax.plot([wsp, wsp], [10, 35], color="#1a5276", lw=1.6)
-        ax.plot(*star, marker="*", ms=20, color="#f1c40f", mec="k", mew=0.8)
+        ax.axhline(amb, color="#1a5276", lw=2.0)
+        for x in _path_at_gusts(mod, kind):
+            ax.plot([x, x], [amb, gust], color="#1a5276", lw=1.6)
+        ax.plot(star_x, amb, marker="*", ms=20, color="#f1c40f", mec="k", mew=0.8)
         ax.set_title(f"{title}\n{sub}", fontsize=15)
         ax.set_xlabel(xlab)
         if xs == THS:
@@ -63,7 +82,8 @@ def fig2():
     axes[0].set_ylabel("disturbance pull (N)")
     handles = [
         Line2D([], [], color="k", lw=2.6, label="STAND certifiable boundary (20% failure)"),
-        Line2D([], [], color="#1a5276", lw=2.0, label="demo ODD path (10 N ambient, gusts to 35 N)"),
+        Line2D([], [], color="#1a5276", lw=2.0,
+               label=f"demo ODD path ({RW.AMBIENT * FORCE_MAX:.0f} N ambient, gusts to {RW.GUST_SCALE * FORCE_MAX:.0f} N)"),
         Line2D([], [], marker="*", ms=15, color="#f1c40f", mec="k", ls="",
                label=f"certified handoff ({SYS} trigger)"),
         Patch(facecolor="none", hatch="////", edgecolor="k", label="neither mode certifiable"),
@@ -222,7 +242,8 @@ def walking_claims():
             ax2 = ax.twinx()
             ax2.fill_between(t, Wv, color="#888", alpha=0.22)
             ax2.plot(t, Wv, color="#555", lw=2.5, label="payload W(t)")
-            ax2.set_ylim(0, 900); ax2.set_yticks([60, 130, 220]); ax2.tick_params(labelsize=11, colors="#555")
+            ax2.set_ylim(0, 900); ax2.set_yticks([E92.W_TRIG, E92.UP_W_GATE, E92.W_HI])
+            ax2.tick_params(labelsize=11, colors="#555")
             for arm in ("WALK-ONLY", "REST-ONLY", "ONE-WAY", "V1", "V2"):
                 if LBL[arm] is None or f"{sched}|{arm}" not in d:
                     continue
@@ -235,8 +256,8 @@ def walking_claims():
             h2, l2 = ax2.get_legend_handles_labels()
             ax.legend(h1 + h2, l1 + l2, fontsize=12, loc="upper center",
                       bbox_to_anchor=(0.5, -0.20), ncol=2, frameon=False, columnspacing=1.0)
-        fig.suptitle(f"Payload-swap walking — {sched} (tall crate 0→220 N, CoM 0.25→0.35 m; N=256, no respawn)",
-                     y=1.05, fontsize=15)
+        fig.suptitle(f"Payload-swap walking — {sched} (tall crate {E92.W_LO:.0f}→{E92.W_HI:.0f} N, CoM "
+                     f"{E92.H_LO:.2f}→{E92.H_HI:.2f} m; N={E92.N}, no respawn)", y=1.05, fontsize=15)
         fig.tight_layout()
         fig.subplots_adjust(wspace=0.34)
         fig.savefig(f"{ART}/E092-payload-walk/claims_{sched}.png", dpi=150, bbox_inches="tight")
@@ -245,14 +266,17 @@ def walking_claims():
 
 
 def standing_survival():
-    for fn, tag, conds, steps in [
+    sys.path.insert(0, "experiments")
+    import E084_automaton as E84
+    for fn, tag, conds in [
         (f"{ART}/E084-automaton/results.json", "waves",
-         [("benign", "square"), ("benign", "sine"), ("gusty", "square"), ("gusty", "sine")], 1000),
+         [("benign", "square"), ("benign", "sine"), ("gusty", "square"), ("gusty", "sine")]),
         (f"{ART}/E084-automaton/results_single.json", "single",
-         [("benign", "pulse"), ("benign", "period"), ("gusty", "pulse"), ("gusty", "period")], 1200)]:
+         [("benign", "pulse"), ("benign", "period"), ("gusty", "pulse"), ("gusty", "period")])]:
         d = json.load(open(fn))
         fig, axes = plt.subplots(1, 4, figsize=(20, 3.4), sharey=True)
-        t = np.arange(steps) * 0.02
+        steps = max(len(v["S"]) for v in d.values())
+        t = np.arange(steps) * E84.DT
         for axx, (cond, sched) in zip(axes, conds):
             for arm in ("V2", "V1", "ONE-WAY", "STAND-ONLY", "REST-ONLY"):
                 S = d[f"{cond}|{sched}|{arm}"]["S"]
@@ -263,7 +287,7 @@ def standing_survival():
         axes[0].set_ylabel("survival S(t) — env-spec accounting")
         hh, ll = axes[0].get_legend_handles_labels()
         fig.legend(hh, ll, fontsize=14, loc="upper center", bbox_to_anchor=(0.5, 0.04), ncol=5, frameon=False)
-        fig.suptitle(f"Standing automaton ({tag}): {SYS} vs baselines (N=256, no respawn)", y=1.02, fontsize=15)
+        fig.suptitle(f"Standing automaton ({tag}): {SYS} vs baselines (N={E84.N}, no respawn)", y=1.02, fontsize=15)
         fig.tight_layout()
         fig.savefig(f"{ART}/E084-automaton/survival_{tag}.png", dpi=140, bbox_inches="tight")
         plt.close(fig)
@@ -297,9 +321,9 @@ def walking_topdown():
                     ax.plot(gx[:last, i], gy[:last, i], color="#777", lw=0.6, alpha=0.30)
             ax.add_patch(plt.Circle((E92.GOAL_D, 0), E92.GOAL_R, fill=False, color="#1a5276", lw=2))
             ax.plot(0, 0, "k^", ms=9)
-            ax.set_title(f"{LBLT[arm]}\nreached {int(reached.sum())}/256 | alive {int(alive.sum())}/256",
-                         fontsize=14)
-            ax.set_xlim(-2, 14.5); ax.set_ylim(-5, 5); ax.set_aspect("equal"); ax.grid(alpha=0.2)
+            ax.set_title(f"{LBLT[arm]}\nreached {int(reached.sum())}/{len(reached)} | "
+                         f"alive {int(alive.sum())}/{len(alive)}", fontsize=14)
+            ax.set_xlim(-2, E92.GOAL_D + 2.5); ax.set_ylim(-5, 5); ax.set_aspect("equal"); ax.grid(alpha=0.2)
             ax.set_xlabel("progress toward goal (m)")
         axes[0].set_ylabel("lateral (m)")
         fig.suptitle(f"Payload-swap walking, top-down — {sched} "
@@ -310,7 +334,6 @@ def walking_topdown():
     print("walking topdowns regenerated")
 
 
-import sys
 if __name__ == "__main__":
     fig2(); print("F2 done")
     fig7(); print("F7 done")

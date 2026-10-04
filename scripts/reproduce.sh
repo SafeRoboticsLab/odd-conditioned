@@ -8,9 +8,9 @@
 #   standing    E084 load waves + E086 single excursions (+ videos)  (paper Sec. 4)        ~30 min
 #   seeds       E094: 3 more reps of e092/waves/single, then mean+-sd (needs e092+standing) ~1.5 h
 #   figures     regenerate F2/F3/F7 + walking/standing figures from data (E093) — needs the
-#               outputs of `certificates e092 standing` first                              ~1 min
+#               outputs of `certificates compound e092 standing` first                     ~1 min
 #   compound    the leg-death-while-loaded demo (E078: matrix, value, ramp, video) (Sec. 5) ~20 min
-#   certificates  the value sweeps behind F2/F7/F3 (E079, E074, E075, E076, E078 value)    ~30 min
+#   certificates  the value sweeps + demo ramps behind F2/F7/F3 (E079, E074, E075, E076, E078) ~15 min
 #   videos      E092 + E091 demo videos (rendered, slow)                                    ~20 min
 #
 # Outputs go to $ODD_ARTIFACTS (default: <repo>/repro — NOT ~/artifacts, so a reproduction never
@@ -47,6 +47,7 @@ check_figure_inputs() {   # E093 re-plots from data: say which target produces a
     [E077-figures/F2_grid.json]=certificates [E074-hicom-demo/task2_value.json]=certificates
     [E074-hicom-demo/task3_ramp.json]=certificates [E075-recal-eval/partA_value.json]=certificates
     [E076-leg-demo/partB_value.json]=certificates [E078-compound-demo/task2_value.json]=certificates
+    [E075-recal-eval/partA_ramp.json]=certificates [E078-compound-demo/task3_ramp.json]=compound
     [E092-payload-walk/results.json]=e092 [E092-payload-walk/traj_dip.npz]=e092
     [E084-automaton/results.json]=standing [E084-automaton/results_single.json]=standing
   )
@@ -83,6 +84,7 @@ run_target() {   # one target; its commands are chained so a failure stops that 
               run e079 experiments/E079_region_sweep.py &&
               run e074_value experiments/E074_value.py &&
               run e074_ramp experiments/E074_ramp.py &&
+              run e075_ramp experiments/E075_ramp.py &&
               run e075_value experiments/E075_value.py &&
               run e076_value experiments/E076_value.py &&
               run e078_value experiments/E078_value.py ;;
