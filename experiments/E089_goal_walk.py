@@ -33,7 +33,7 @@ from robot_safety_sandbox import make_tensor, spec
 from robot_safety_sandbox.eval.policies import load_twin
 import E084_automaton as E
 from E084_automaton import (CK, load_twins, value_of, in_rest_target, in_stance_target,
-                            EPS_UP, K_UP, EPS_ABORT, K_ABORT, REFRACT, ALPHA, K_DN, WARMUP)
+                            EPS_UP, K_UP, EPS_ABORT, K_ABORT, REFRACT, ALPHA, K_DN, WARMUP, V1_UP, V1_K_UP)
 from go2_atomic_skills.nets import WalkerNorm, load_actor
 from go2_atomic_skills.obs import DEFAULT_JOINT_POS, CTRL_GAIN, WALK_PHASE_PERIOD, PHASE_STAND_EPS
 
@@ -167,6 +167,7 @@ def rollout(sched, cond, arm, n=N, cal=False, record=False, render=False):
         vs_bar = Vs.clone() if t == 0 else (1 - ALPHA) * vs_bar + ALPHA * Vs
         if cal:
             cal_tr["vs"].append(vs_bar.clone()); cal_tr["W"].append(W)
+            cal_tr.setdefault("alive", []).append(alive.clone())
         if arm == "V2-REUSE":
             m_u, n_u = tw["getup"]
             Vu = value_of(env, m_u, n_u)
@@ -195,12 +196,12 @@ def rollout(sched, cond, arm, n=N, cal=False, record=False, render=False):
             refr = th.where(go_desc | go_up | go_abort, th.full_like(refr, REFRACT), refr - 1)
         elif arm in ("V1", "ONE-WAY"):
             below = th.where(vs_bar < EPS_DN_WALK, below + 1, th.zeros_like(below))
-            above = th.where(vs_bar > 0.15, above + 1, th.zeros_like(above))
+            above = th.where(vs_bar > V1_UP, above + 1, th.zeros_like(above))
             can = (refr <= 0) & (t >= WARMUP)
             go_dn = (~v1_in_rest) & (below >= K_DN_WALK) & can
             if t * DT < 5.0:
                 early_desc += int((go_dn & alive).sum())
-            go_up = v1_in_rest & (above >= 25) & can & th.tensor(arm == "V1", device=DEV)
+            go_up = v1_in_rest & (above >= V1_K_UP) & can & th.tensor(arm == "V1", device=DEV)
             v1_in_rest = th.where(go_dn, th.ones_like(v1_in_rest), v1_in_rest)
             v1_in_rest = th.where(go_up, th.zeros_like(v1_in_rest), v1_in_rest)
             walker.reset(go_up)

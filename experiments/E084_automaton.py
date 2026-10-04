@@ -22,6 +22,7 @@ EPS_DN, K_DN = -0.05, 5
 EPS_UP, K_UP = 0.10, 15   # 0.02 let W=220 prone states fire get-up (E086 diag: 96 mid-pulse attempts, 98 aborts)
 EPS_ABORT, K_ABORT = -0.02, 10
 REFRACT, ALPHA = 50, 0.1
+V1_UP, V1_K_UP = 0.15, 25       # V1 ("direct") return: EMA V_stand read while lying down > V1_UP for V1_K_UP steps
 WARMUP = 50                     # no triggers during the spawn transient (E086 diag: EMA-from-0 dips fired descents at W=40)
 UP_W_GATE = None                # if set: get-up allowed only while the ODD estimate W < gate (belief-gated return; E086 sets 130)
 CK = {
@@ -119,7 +120,7 @@ def rollout(sched, cond, arm, cal=None):
     deaths = {s: 0 for s in STATES}
     S = []
     v1_in_rest = th.zeros(N, dtype=th.bool, device=DEV)  # for V1/ONE-WAY arms
-    cal_vals = []
+    cal_vals, cal_v1 = [], []
     for t in range(STEPS):
         W = W_of(sched, t)
         env.base_load = th.tensor([0., 0., -W], device=DEV)[None].expand(N, 3).contiguous()
@@ -146,7 +147,9 @@ def rollout(sched, cond, arm, cal=None):
             if cal == "up":
                 go_up = th.zeros_like(go_up)
                 if W < (UP_W_GATE if UP_W_GATE is not None else 130.0):
-                    cal_vals.append(vu_bar[alive & (st == 2) & (settle >= 5)].clone())
+                    sel = alive & (st == 2) & (settle >= 5)
+                    cal_vals.append(vu_bar[sel].clone())
+                    cal_v1.append(vs_bar[sel].clone())
             go_stand = (st == 3) & (standok >= 5)
             go_abort = (st == 3) & (abort_c >= K_ABORT)
             st = th.where(go_desc, th.ones_like(st), st)
@@ -158,10 +161,10 @@ def rollout(sched, cond, arm, cal=None):
             refr = th.where(sw, th.full_like(refr, REFRACT), refr - 1)
         elif arm in ("V1", "ONE-WAY"):
             below = th.where(vs_bar < EPS_DN, below + 1, th.zeros_like(below))
-            above = th.where(vs_bar > 0.15, above + 1, th.zeros_like(above))   # batch-1 prone-V guard
+            above = th.where(vs_bar > V1_UP, above + 1, th.zeros_like(above))   # batch-1 prone-V guard
             can = (refr <= 0) & (t >= WARMUP)
             go_dn = (~v1_in_rest) & (below >= K_DN) & can
-            go_up = v1_in_rest & (above >= 25) & can & th.tensor(arm == "V1", device=DEV)
+            go_up = v1_in_rest & (above >= V1_K_UP) & can & th.tensor(arm == "V1", device=DEV)
             v1_in_rest = th.where(go_dn, th.ones_like(v1_in_rest), v1_in_rest)
             v1_in_rest = th.where(go_up, th.zeros_like(v1_in_rest), v1_in_rest)
             refr = th.where(go_dn | go_up, th.full_like(refr, REFRACT), refr - 1)
@@ -199,7 +202,7 @@ def rollout(sched, cond, arm, cal=None):
         S.append(float(alive.float().mean()))
     env.close()
     afford = float((stand_time / alive_time.clamp_min(1)).mean())
-    return {"S": S, "final": S[-1], "afford_alive": afford, "deaths": deaths, "cal": cal_vals}
+    return {"S": S, "final": S[-1], "afford_alive": afford, "deaths": deaths, "cal": cal_vals, "cal_v1": cal_v1}
 
 
 if __name__ == "__main__":

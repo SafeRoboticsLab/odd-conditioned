@@ -27,7 +27,7 @@ import numpy as np
 from robot_safety_sandbox import make_tensor, spec
 from robot_safety_sandbox.eval.policies import load_twin
 from E084_automaton import (CK, load_twins, cal_summary, value_of, in_rest_target, in_stance_target,
-                            EPS_UP, K_UP, EPS_ABORT, K_ABORT, REFRACT, ALPHA)
+                            EPS_UP, K_UP, EPS_ABORT, K_ABORT, REFRACT, ALPHA, V1_UP, V1_K_UP)
 import E089_goal_walk as G
 
 DEV, N, DT, STEPS = "cuda:0", 256, 0.02, 2000
@@ -153,8 +153,8 @@ def rollout(sched, arm, n=N, record=False, render=False, cal_up=False):
                     cal_vals.append(vu_bar[alive & (st == 2) & (settle >= 5)].clone())
             go_abort = (st == 3) & (abort_c >= K_ABORT)
         elif arm == "V1":
-            v1_above = th.where(vs_bar > 0.15, v1_above + 1, th.zeros_like(v1_above))
-            go_up = (st == 2) & (v1_above >= 25) & can          # blind return (no belief, no funnel)
+            v1_above = th.where(vs_bar > V1_UP, v1_above + 1, th.zeros_like(v1_above))
+            go_up = (st == 2) & (v1_above >= V1_K_UP) & can     # blind return (no belief, no funnel)
         go_stand = (st == 3) & (standok >= 5)
         if arm == "V1":
             go_stand = (st == 3)

@@ -203,8 +203,8 @@ bash scripts/train_all.sh core            # ~2 h: the 4 policies sections 1-5 ru
 bash scripts/train_all.sh certificates    # ~4 h: the 7 behind sections 6-8
 ```
 
-Then recalibrate the switching thresholds — each experiment script has a `--cal` / `--cal-up` / `--cal-dn`
-probe — and rerun the targets above. Full procedure, per-policy recipes and the calibration table:
+Then recalibrate the switching thresholds with `python scripts/calibrate.py` (it runs every probe and prints the
+value to set for each constant) and rerun the targets above. Full procedure, per-policy recipes and the calibration table:
 [TRAINING.md](TRAINING.md). Retrained policies give different but comparable numbers (single training seed,
 GPU nondeterminism).
 

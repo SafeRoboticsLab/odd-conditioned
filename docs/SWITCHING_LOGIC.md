@@ -194,6 +194,10 @@ work (see `docs/STATUS.md`).
 
 ## 6. Where the numbers live
 
+All value-dependent constants below are re-placed for new networks by `python scripts/calibrate.py`
+(procedure and rules: [TRAINING.md §6](TRAINING.md#6-recalibrating-the-switching-thresholds-after-any-retraining)).
+V1's return threshold is the named constant `V1_UP` / `V1_K_UP` in `E084_automaton.py`.
+
 | constant | E084 | E086 | E089 | E091 | E092 |
 |---|---|---|---|---|---|
 | descent trigger | `V̄_stand<-0.05` ×5 | same | `V̄_stand<-0.15` ×10 | residual `>0.03` ×10 | `W≥60` ×3 |

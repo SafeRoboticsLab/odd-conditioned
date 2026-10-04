@@ -195,20 +195,39 @@ Earlier experiments (E040–E069) load the payload and weak-leg runs (`results/g
 
 ## 6. Recalibrating the switching thresholds (after any retraining)
 
-The automata compare learned values against fixed thresholds (constants at the top of each experiment script).
-Those numbers were read off the distributions of the *shipped* value networks; a retrained network has a
-different scale, so measure the same distributions and re-place each threshold by the same rule. Each probe
-below takes under a minute on a 4070 and prints percentiles plus the fraction the current threshold fires on.
+The automata compare learned values (and one torque residual) against constants at the top of the experiment
+scripts. Those constants were placed on the *shipped* value networks at specific operating points; a retrained
+network — or a retuned margin function — changes the value scale, so the thresholds must be re-placed at the
+same operating points. One script does it:
 
-| threshold (script: constant) | measure with | where the shipped threshold sits | rule |
+```bash
+python scripts/calibrate.py            # all thresholds, 3 pooled probe repetitions, ~6 min on an RTX 4070
+python scripts/calibrate.py --only standing payload --reps 1     # a subset / a quick look
+```
+
+It runs every probe on the checkpoints in `results/`, and prints for each constant its file, the current value,
+the recommended value, and the evidence (percentiles of the measured distribution and how often the current value
+fires or passes). It edits nothing: set the recommended values at the top of the named scripts, then rerun the
+targets. Pool repetitions (`--reps 3`, the default): the operating points sit in distribution tails, and a single
+run moves them by a few hundredths.
+
+**Check of the rules:** run on the shipped checkpoints, the script reproduces the shipped constants —
+
+| constant (script) | shipped | recommended on shipped nets | rule (operating point) |
 |---|---|---|---|
-| standing descent, `E084_automaton.py`: `EPS_DN = -0.05` (×`K_DN = 5` steps) | `python experiments/E084_automaton.py --cal-dn` — `V̄_stand` on standing robots at W = 40 / 130 / 220 N | fires on 7 % of samples at 40 N, 22 % at 130 N, 83 % at 220 N | between the light-load and heavy-load bands; the K-step sustain removes most single-sample false fires |
-| standing return, `E084_automaton.py`: `EPS_UP = 0.10` (×15), abort `EPS_ABORT = -0.02` (×10) | `python experiments/E084_automaton.py --cal-up` — `V̄_up` on settled-rest robots once the load has cleared, return disabled | passes 6 % of samples (median −0.15) — strict; it was raised from 0.02 after get-ups fired under a 220 N load | return threshold where the cleared-load rest poses pass but loaded ones do not; abort ~0.1 below it |
-| walking descent (weight walk), `E089_goal_walk.py`: `EPS_DN_WALK = -0.15` (×`K_DN_WALK = 10`) | `python experiments/E089_goal_walk.py --cal` — `V̄_stand` while walking at W = 0 / 120 / 220 N; then try values with `--eps_dn` | healthy walking: p1 −0.10, p5 −0.07; loaded walking: median −0.12 to −0.16 | chosen from a sweep of false descents on healthy walking (1.6 % per 30 s) against detection delay (0.57 s at 220 N) |
-| leg-fault detector, `E091_leg_walk.py`: `ERR_DEG = 0.03` (×`K_DEG = 10`) | `python experiments/E091_leg_walk.py --cal` — torque-saturation residual on healthy vs derated walking | healthy p99 0.0000; derated median 0.008, p99 0.086 | above the healthy band with margin. Depends on the walker and the physics, not on the safety networks — only needs redoing if the walker changes |
-| leg-fault return, `E091_leg_walk.py`: `EPS_UP_LEG = -0.35`, abort `EPS_ABORT_LEG = -0.45` | `python experiments/E091_leg_walk.py --cal-up` | ≈ 12th percentile of `V̄_up` on settled rest after the leg heals (passes 88 %) | a little below the settled-rest median, so most robots qualify once the belief says the leg is healthy (the belief carries the ODD decision; the certificate screens out bad poses); abort ~0.1 lower |
-| payload-walk return, `E092_payload_walk.py`: `EPS_UP_92 = -0.30`, abort `EPS_ABORT_92 = -0.45` | `python experiments/E092_payload_walk.py --cal-up` | ≈ 35th percentile (passes 65 %; median −0.28) | same rule; abort ~0.15 lower |
-| one-way demo triggers: `E074_ramp.py` −0.04, `E075_ramp.py` −0.05, `E078_ramp.py` −0.14 | the matching `*_value.py` sweeps; `E074_tune.py` (forced-switch sweep) | inside the window where a forced switch is mechanically safe | same idea as the standing descent |
+| `EPS_DN` (E084) standing descent | −0.05 | −0.041 | 7th percentile of V̄_stand, robots standing under 40 N |
+| `EPS_UP` (E084, also E086/E089) standing get-up gate | +0.10 | +0.091 | 94th percentile of V̄_up on settled rest after the load clears |
+| `EPS_ABORT` (E084) | −0.02 | −0.029 | `EPS_UP` − 0.12 |
+| `V1_UP` (E084; used by E089/E091/E092) V1 return | 0.15 | 0.150 | 21st percentile of V̄_stand on the same settled-rest robots |
+| `EPS_DN_WALK` (E089) walking descent | −0.15 | −0.12 | highest value with ≤ 1.6 % false descents per 30 s of healthy walking (`K_DN_WALK`-step sustain, surviving robots); the shipped value is more conservative than the cap (0.4–0.8 % here) |
+| `ERR_DEG` (E091) leg-fault residual | 0.03 | 0.03 | keep while between the healthy band (p99 ≈ 0.002) and the derated band (median ≈ 0.012); depends on the walker and physics, not the safety networks |
+| `EPS_UP_LEG` / `EPS_ABORT_LEG` (E091) | −0.35 / −0.45 | −0.337 / −0.437 | 12th percentile of V̄_up on settled rest after the leg heals; abort 0.10 lower |
+| `EPS_UP_92` / `EPS_ABORT_92` (E092) | −0.30 / −0.45 | −0.296 / −0.446 | 35th percentile of V̄_up on settled rest after the load clears; abort 0.15 lower |
+| `EPS` (E078_ramp) compound demo trigger | −0.14 | −0.141 | midpoint of the certified- and failed-band value means (E078_value) |
+| `EPS` (E074_ramp, E075_ramp) weight demo triggers | −0.04, −0.05 | reported only | placed inside the window where a forced switch is mechanically safe: run `python experiments/E074_tune.py` and pick inside its low-tip window. The script reports the value-sweep midpoint and the discrimination; a discrimination < 1 means the certificate is flat and the policy should be retrained |
+
+The individual probes are also available directly: `E084_automaton.py --cal-dn / --cal-up`,
+`E089_goal_walk.py --cal`, `E091_leg_walk.py --cal / --cal-up`, `E092_payload_walk.py --cal-up`.
 
 Not tied to the networks (no recalibration needed): the E092 load-belief trigger `W_TRIG = 60 N` (the edge of
 the walker's comfortable load), the return gate `UP_W_GATE = 130 N` (the measured stand-feasibility boundary),
