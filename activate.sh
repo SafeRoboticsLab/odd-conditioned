@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# odd-conditioned environment. `source activate.sh` from anywhere, then run experiments from the repo
-# root as NORMAL python scripts: `python experiments/E0XX.py` — no wrapper needed.
+# odd-conditioned environment. `source activate.sh` from anywhere, then run the scripts as normal python:
+# `python scripts/evaluate.py payload` — no wrapper needed.
 #
 # Layout: a conda env (default name `mjlab`, override with ODD_CONDA_ENV) supplies the heavy/compiled
 # deps (torch+CUDA, mujoco, mujoco-warp, warp, mjlab 1.1.1 — see requirements.txt); a per-project
@@ -14,14 +14,14 @@
 # what gives them precedence.
 #
 # Overrides: ODD_CONDA_ENV (conda env name), CONDA_BASE (conda install root),
-#            ODD_ARTIFACTS (where scripts write outputs; see experiments/_paths.py).
+#            ODD_CHECKPOINTS / ODD_OUTPUTS (where policies are read / results written; odd_conditioned/paths.py).
 # Deliberately no `set -e`: this file is SOURCED, and `set -e` would leak into your shell.
 
 _odd_activate() {
   local WS SB3 RSS G2S base envname d
   WS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   SB3="$WS/external/safety-stable-baselines"        # safety_sb3 v0.4.0
-  RSS="$WS/external/robot-safety-sandbox"            # RSS 0.4.0 + this project's tasks
+  RSS="$WS/external/robot-safety-sandbox"            # RSS 0.4.0 + this project's tasks (project/odd-conditioned)
   G2S="$WS/external/go2_atomic_skills"               # pretrained Go2 walker (nominal task policy)
 
   for d in "$SB3/safety_sb3" "$RSS/robot_safety_sandbox" "$G2S/go2_atomic_skills"; do
@@ -67,6 +67,6 @@ print("go2_atomic_skills   :", g.__file__)
 print("resolution          :", "OK" if ok else "WRONG — another copy shadows the submodules")
 PY
   cd "$WS" || return 1
-  echo "[env] ready — run from $WS: python experiments/<name>.py"
+  echo "[env] ready — e.g. python scripts/evaluate.py payload"
 }
 _odd_activate

@@ -1,7 +1,7 @@
 [submodule "external/robot-safety-sandbox"]
 	path = external/robot-safety-sandbox
 	url = git@github.com:SafeRoboticsLab/robot-safety-sandbox.git
-	branch = project/odd-conditioned-go2-payload
+	branch = project/odd-conditioned
 [submodule "external/safety-stable-baselines"]
 	path = external/safety-stable-baselines
 	url = git@github.com:SafeRoboticsLab/safety-stable-baselines.git
