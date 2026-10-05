@@ -167,7 +167,7 @@ def demos():
                          "no value sweep — run: python scripts/evaluate.py certificates"))
             continue
         q = json.load(open(f))["readouts"][readout]
-        flat = q["discrim"] < 1.0
+        flat = q["discrim"] < 0.5                 # the unloaded-leg control reads ~0.0; usable certificates >= ~1
         rec = q["eps"] if rule == "value-sweep midpoint" and not flat else None
         ev = f"value-sweep midpoint {q['eps']:+.3f}, discrimination {q['discrim']:.2f}"
         if flat:

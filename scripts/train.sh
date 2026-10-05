@@ -69,19 +69,24 @@ WARMSTART_SOURCES=" rest getup_stage1 "
 
 install() {   # install <name> <run dir>: final-step checkpoint -> $CKPT/<name>/
   local name="$1" run="$2" dst="$CKPT/$1" zip norm
-  read -r zip norm < <(python - "$run/checkpoints" <<'PY'
-import glob, re, sys
+  read -r zip norm < <(python - "$run" <<'PY'
+import glob, os, re, sys
 from robot_safety_sandbox.eval.policies import find_obs_stats
-zips = glob.glob(f"{sys.argv[1]}/model_*_steps.zip")
-z = max(zips, key=lambda f: int(re.search(r"model_(\d+)_steps", f).group(1)))
-print(z, find_obs_stats(z, "tensornorm", "tensornormalize.pt"))
+run = sys.argv[1]
+zips = glob.glob(f"{run}/checkpoints/model_*_steps.zip")
+if zips:   # the last periodic checkpoint (what the published policies are)
+    z = max(zips, key=lambda f: int(re.search(r"model_(\d+)_steps", f).group(1)))
+    print(z, find_obs_stats(z, "tensornorm", "tensornormalize.pt"))
+else:      # a run shorter than the checkpoint interval (e.g. SMOKE=1): its final model
+    print(f"{run}/final_model.zip", f"{run}/tensornormalize.pt")
 PY
 )
+  [ -f "$zip" ] && [ -f "$norm" ] || { echo "[train] $name: no checkpoint found in $run" >&2; exit 1; }
   rm -rf "$dst"; mkdir -p "$dst"
   cp "$zip" "$dst/model.zip"; cp "$norm" "$dst/tensornormalize.pt"; cp "$run/config.yaml" "$dst/config.yaml"
   if [[ "$WARMSTART_SOURCES" == *" $name "* ]]; then
     mkdir -p "$dst/final"
-    cp "$run/final_model.zip" "$dst/final/model.zip"; cp "$run/tensornormalize.pt" "$dst/final/tensornormalize.pt"
+    cp "$run/final_model.zip" "$dst/final/final_model.zip"; cp "$run/tensornormalize.pt" "$dst/final/tensornormalize.pt"
   fi
   echo "[train] $name installed -> $dst ($(basename "$zip"))"
 }
@@ -100,10 +105,10 @@ train() {
     fi
   fi
   if [ -n "$src" ]; then
-    if [ ! -f "$CKPT/$src/final/model.zip" ]; then
-      echo "[train] $name warm-starts from $CKPT/$src/final/model.zip — train '$src' first" >&2; exit 1
+    if [ ! -f "$CKPT/$src/final/final_model.zip" ]; then
+      echo "[train] $name warm-starts from $CKPT/$src/final/final_model.zip — train '$src' first" >&2; exit 1
     fi
-    load=(--load "$CKPT/$src/final/model.zip")
+    load=(--load "$CKPT/$src/final/final_model.zip")
   fi
   echo "[train] $name -> $run  (log: $RUNS/logs/$name.log)"
   # shellcheck disable=SC2086

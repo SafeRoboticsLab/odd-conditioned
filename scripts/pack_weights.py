@@ -30,7 +30,7 @@ def files():
     for name in POLICIES:
         out += [f"checkpoints/{name}/{f}" for f in ("model.zip", "tensornormalize.pt", "config.yaml")]
     for name in ("rest", "getup_stage1"):
-        out += [f"checkpoints/{name}/final/{f}" for f in ("model.zip", "tensornormalize.pt")]
+        out += [f"checkpoints/{name}/final/{f}" for f in ("final_model.zip", "tensornormalize.pt")]
     out.append("checkpoints/getup_stage1/config.yaml")
     missing = [f for f in out if not os.path.exists(os.path.join(REPO, f))]
     if missing:
