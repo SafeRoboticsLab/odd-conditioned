@@ -11,10 +11,14 @@ loaded in between.
 import contextlib
 import io
 import os
+import warnings
 
 import torch as th
 
 os.environ.setdefault("MUJOCO_GL", "egl")
+# Harmless library notices that would otherwise interleave with every result table.
+warnings.filterwarnings("ignore", message="Use of index_put_ on expanded tensors", category=UserWarning)
+warnings.filterwarnings("ignore", message="You are trying to run .* on the GPU", category=UserWarning)
 
 DEV = "cuda:0"
 DT = 0.02                                   # control period: 50 Hz

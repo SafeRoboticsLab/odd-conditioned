@@ -100,7 +100,7 @@ def payload(profile="period", methods=("task-only", "one-way", "direct", "odd"))
             s = (2 if r["success"] > 0 else (1 if r["safe"] > 0 else 0), prog)
             if s > score:
                 pick, score = r, s
-            if s[0] == 2:
+            if s[0] == 2 or (m in ("task-only", "one-way") and k >= 2):   # these never reach the goal
                 break
         best[m] = pick
         print(f"solo {profile} {m}: reached {pick['success']:.0f} alive {pick['safe']:.0f} (seed {pick['seed']})",

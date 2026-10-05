@@ -244,7 +244,7 @@ def payload_claims(profile):
     p = sc.params
     t = np.arange(sc.steps) * DT
     Wv = np.array([sc.odd(k)[0] for k in range(sc.steps)])
-    n = next(iter(d.values()))["n"]
+    n, seed = next(iter(d.values()))["n"], next(iter(d.values()))["seed"]
     fig, axes = plt.subplots(1, 2, figsize=(14.5, 5.2))
     for ax, key, ylab, title in ((axes[0], "S", "survival S(t)", "Safety (death = flip-over)"),
                                  (axes[1], "SUC", "success CDF (fraction of fleet at goal)",
@@ -272,7 +272,7 @@ def payload_claims(profile):
         ax.legend(h1 + h2, l1 + l2, fontsize=12, loc="upper center", bbox_to_anchor=(0.5, -0.20), ncol=2,
                   frameon=False, columnspacing=1.0)
     fig.suptitle(f"Payload-swap walking — {profile} (tall crate {p['W_lo']:.0f}→{p['W_hi']:.0f} N, CoM "
-                 f"{p['h_lo']:.2f}→{p['h_hi']:.2f} m; N={n}, no respawn)", y=1.05, fontsize=15)
+                 f"{p['h_lo']:.2f}→{p['h_hi']:.2f} m; N={n}, seed {seed}, no respawn)", y=1.05, fontsize=15)
     fig.tight_layout()
     fig.subplots_adjust(wspace=0.34)
     _save(fig, f"payload_claims_{profile}.png")
@@ -344,8 +344,9 @@ def standing_survival(table):
     axes[0].set_ylabel("survival S(t)")
     hh, ll = axes[0].get_legend_handles_labels()
     fig.legend(hh, ll, fontsize=14, loc="upper center", bbox_to_anchor=(0.5, 0.04), ncol=5, frameon=False)
-    n = next(iter(d.values()))["n"]
-    fig.suptitle(f"Standing automaton ({table}): {SYS} vs baselines (N={n}, no respawn)", y=1.02, fontsize=15)
+    n, seed = next(iter(d.values()))["n"], next(iter(d.values()))["seed"]
+    fig.suptitle(f"Standing automaton ({table}): {SYS} vs baselines (N={n}, seed {seed}, no respawn)", y=1.02,
+                 fontsize=15)
     fig.tight_layout()
     _save(fig, f"standing_survival_{table}.png", dpi=140)
 
