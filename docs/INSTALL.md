@@ -53,10 +53,12 @@ editable-installs the two safety packages; every time, it prepends the three sub
 
 ## 4. Trained checkpoints
 
-Checkpoints are not in git. Install the published archive (~155 MB) and verify it:
+Checkpoints are not in git. They are published on Hugging Face,
+[buzinguyen/odd-conditioned-dev](https://huggingface.co/buzinguyen/odd-conditioned-dev). Download the archive
+(~155 MB), install it and verify it:
 
 ```bash
-bash scripts/fetch_weights.sh <odd-conditioned-weights-v1.tar.gz or its URL>
+bash scripts/fetch_weights.sh                          # or: bash scripts/fetch_weights.sh <local archive>
 ```
 
 This puts every policy under `checkpoints/<name>/` (`model.zip`, `tensornormalize.pt`, `config.yaml`) and checks

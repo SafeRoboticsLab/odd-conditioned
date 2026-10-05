@@ -41,12 +41,13 @@ conda create -y -n mjlab python=3.11 && conda activate mjlab
 pip install torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
 pip install -r requirements.txt
 source activate.sh                                # every session; prints "resolution : OK"
-bash scripts/fetch_weights.sh <archive or URL>    # the published checkpoints -> checkpoints/ (verified)
+bash scripts/fetch_weights.sh                     # the published checkpoints -> checkpoints/ (verified)
 pytest -q tests/                                  # smoke suite, ~2 min
 bash scripts/reproduce.sh payload figures         # the walking table above, ~6 min -> outputs/
 ```
 
-Or train every policy yourself: `bash scripts/train.sh core certificates` (~4.5 h on one RTX 4070) — see
+The trained policies are published on Hugging Face:
+[buzinguyen/odd-conditioned-dev](https://huggingface.co/buzinguyen/odd-conditioned-dev). Or train every policy yourself: `bash scripts/train.sh core certificates` (~4.5 h on one RTX 4070) — see
 [docs/TRAINING.md](docs/TRAINING.md) first: the stance experts vary from run to run and are accepted by test.
 
 ## Documentation

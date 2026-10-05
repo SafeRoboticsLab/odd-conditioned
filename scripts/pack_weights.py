@@ -3,8 +3,9 @@
     python scripts/pack_weights.py --tag v1     # -> dist/odd-conditioned-weights-v1.tar.gz, weights/MANIFEST.sha256
 
 The archive holds checkpoints/<name>/{model.zip, tensornormalize.pt, config.yaml} for every policy in
-odd_conditioned/policies.py, plus the warm-start finals of rest and getup_stage1. Commit the manifest; publish
-the archive and point users at it (scripts/fetch_weights.sh).
+odd_conditioned/policies.py, plus the warm-start finals of rest and getup_stage1. Commit the manifest; upload the
+archive (and the checkpoints/ tree) to the Hugging Face model repo, and pin the new upload commit in the URL at
+the top of scripts/fetch_weights.sh.
 """
 import argparse
 import hashlib
