@@ -2,207 +2,193 @@
 
 The ODD-conditioned safety filter is a small **automaton over specification modes**. Each mode has its own
 reach-avoid specification, its own trained expert policy, and that expert's learned value (the mode's
-**certificate**). The automaton decides *which mode's expert drives the robot*; this page states exactly
-what has to be true before it moves between modes. Everything below is read off the code
-(`experiments/E084_automaton.py`, `E086_single_pulse.py`, `E092_payload_walk.py`, `E091_leg_walk.py`,
-`E089_goal_walk.py`); line-level constants are named so you can grep them.
+**certificate**). The automaton decides which mode's expert drives the robot; this page states exactly what
+has to be true before it moves between modes. Everything here is read off
+[`odd_conditioned/automaton.py`](../odd_conditioned/automaton.py) (the logic) and
+[`odd_conditioned/scenarios.py`](../odd_conditioned/scenarios.py) (the per-scenario wiring and thresholds).
 
 Control runs at **50 Hz** (`DT = 0.02 s`), so "K steps" below means K × 20 ms.
 
-## 0. Two constructions in this repo — don't mix them up
+## 0. Two constructions — don't mix them up
 
-1. **One-way handoff (E071–E079, the certificate demos).** Two policies per ODD family — a STAND expert and
-   a REST expert — and a single switch: when the STAND certificate collapses, hand the robot to the REST
-   expert and never come back. No transition policies. This is what the weight-ladder (E071/E074/E075),
-   leg-family (E076) and compound (E078) demos run, each with its own stand/rest pair (`go2_weight_*`,
-   `go2_leg_*`, `go2_compound_*`). It answers "does the certificate know when to give up standing?"
-2. **The certified automaton (E080 on, the paper's system).** Two **modes** (STAND/WALK, REST) plus two
-   **transitions** (descend, get up), each transition its own trained reach-avoid policy, so the robot can
-   go down *and come back up* as the ODD changes. The rest of this page is about this construction.
+1. **One-way handoff** (the certificate experiments, [`certificates.py`](../odd_conditioned/certificates.py)).
+   Two policies per ODD axis — a STAND expert and a REST expert — and a single switch: when the STAND
+   certificate collapses, hand the robot to the REST expert and never come back. No transition policies. It
+   answers "does the certificate know when to give up standing?" on three axes: carried load, leg derating,
+   and leg derating while loaded.
+2. **The certified automaton** (the system, [`automaton.py`](../odd_conditioned/automaton.py)). Two **modes**
+   (STAND/WALK, REST) plus two **transitions** (descend, get up), each transition its own trained reach-avoid
+   policy, so the robot can go down *and come back up* as the ODD changes. The rest of this page is about
+   this construction.
 
 ## 1. The modes and their experts
 
-| state | runs | trained artifact (checkpoint under `results/`) | its certificate |
+| mode | runs | checkpoint (`checkpoints/<name>`) | its certificate |
 |---|---|---|---|
-| **STAND** (standing automaton) | stance expert | `go2_weight_runs/E075_recal/go2_weight_stand_hi_adv` ("stand_hi") | `V_stand` |
-| **WALK** (walking automata) | nominal joystick walker (task policy, no safety training) | `external/go2_atomic_skills` `walker_actor.pt` | — (uses `V_stand` as a proxy only in E089) |
-| **BRAKE** (walking only) | E092: stance expert stand_hi · E091: walker with zero command | — | — |
-| **DESCENDING** | descent funnel `descend_v4` (arm "V2") **or** rest expert (arms "V2-REUSE", V1, ONE-WAY) | `go2_transition_runs/descend_v4/go2_descend_adv` / `go2_weight_runs/go2_weight_rest_hi_adv` | — |
-| **REST** | rest expert ("rest_hi"), lie down and stay settled | `go2_weight_runs/go2_weight_rest_hi_adv` | — |
-| **GETTINGUP** | get-up funnel ("getup_v2") | `go2_transition_runs/getup_v2/go2_getup_adv` | `V_up` |
+| **TASK**, standing | STAND expert | `stand` | `V_stand` |
+| **TASK**, walking | nominal joystick walker (no safety training) | `external/go2_atomic_skills` (`walker_actor.pt`) | — |
+| **BRAKE** (walking only) | payload walk: the STAND expert · leg-fault walk: the walker with a zero command | — | — |
+| **DESCENDING** | descent funnel (`odd`) **or** the REST expert (`odd-rest-descent`, `direct`, `one-way`) | `descend` / `rest` | — |
+| **REST** | REST expert: lie down and stay settled | `rest` | — |
+| **GETTING_UP** | get-up funnel | `getup` | `V_up` |
 
-Each expert is a two-player (control vs. adversarial push) reach-avoid PPO twin (`ReachAvoidPPO2P`). Its
-value net gives `V(s) ≥ 0` ⇔ "this mode's spec is (estimated) still satisfiable from here". The runtime
-reads it as `V = model.policy.predict_values(norm(obs))` on the 48-d actor observation (helper:
-`value_of` in E084, `experiments/_value_util.py`). All four twins also observe the carried load W
-(the 48th observation), so their policies and certificates are load-aware. How the two transition funnels
-are built (start states, targets, warm-starts): [TRAINING.md §4](TRAINING.md#the-two-transition-funnels).
+Each expert is a two-player (control vs. adversarial push) reach-avoid PPO twin (`ReachAvoidPPO2P` from
+safety-stable-baselines). Its value net gives `V(x) ≥ 0` ⇔ "this mode's specification is (estimated) still
+satisfiable from here". The runtime reads it as `model.policy.predict_values(norm(obs))` on the 48-d actor
+observation (`policies.Twin.value`). All four twins also observe the carried load W, so their policies and
+certificates are load-aware. How the two funnels are built: [TRAINING.md](TRAINING.md#the-two-transition-funnels).
 
-### Which policy drives which state, per experiment
+### Which policy flies which mode, per scenario
 
-The checkpoints are trained once and shared: every automaton experiment loads the same `CK` dict from
-`experiments/E084_automaton.py`. What differs is which of them each experiment uses where.
+The checkpoints are trained once and shared; what differs is which of them each scenario uses where.
 
-| experiment / arm | STAND or WALK | BRAKE | DESCENDING | REST | GETTINGUP | values that decide switches |
+| scenario / method | TASK | BRAKE | DESCENDING | REST | GETTING_UP | values that decide switches |
 |---|---|---|---|---|---|---|
-| **E084/E086 standing, V2** | stand_hi | — | descend_v4 | rest_hi | getup_v2 | `V_stand` (descent trigger), `V_up` (return + abort) |
-| E084/E086 standing, V2-REUSE | stand_hi | — | rest_hi | rest_hi | getup_v2 | same |
-| **E092 payload walk, V2** | walker | stand_hi | descend_v4 | rest_hi | getup_v2 | `V_up` only (descent trigger = load belief W ≥ 60 N) |
-| E091 leg-fault walk, V2-REUSE | walker | walker, zero command | rest_hi | rest_hi | getup_v2 | `V_up` only (descent trigger = torque-saturation residual) |
-| E089 weight walk, V2-REUSE | walker | — | rest_hi | rest_hi | getup_v2 | `V_stand` (descent trigger), `V_up` |
-| V1 / ONE-WAY (any experiment) | stand_hi or walker | as V2 in E091/E092 | rest_hi | rest_hi | — (V1 hands straight back to the stand/walk policy) | descent: that experiment's V2 trigger · V1 return: `V_stand` read while lying down |
+| **standing-\*, `odd`** | stand | — | descend | rest | getup | `V_stand` (descent trigger), `V_up` (return + abort) |
+| standing-\*, `odd-rest-descent` | stand | — | rest | rest | getup | same |
+| **payload-\*, `odd`** | walker | stand | descend | rest | getup | `V_up` only (descent trigger = load belief W ≥ 60 N) |
+| **leg-fault, `odd`** | walker | walker, zero command | rest | rest | getup | `V_up` only (descent trigger = torque-saturation residual) |
+| weight-walk-\*, `odd` | walker | — | rest | rest | getup | `V_stand` (descent trigger), `V_up` |
+| `direct` / `one-way` (any scenario) | stand or walker | as `odd` | rest | rest | — | descent: the scenario's trigger · `direct` return: `V_stand` read while lying down |
 
-So standing V2 runs exactly four safety policies (STAND, REST, and one reach-avoid policy per transition
-direction); walking V2 in E092 adds the walker as the task policy, with stand_hi reused as the brake.
+So standing `odd` runs exactly four safety policies (STAND, REST, one reach-avoid policy per transition
+direction); the payload walk adds the walker as the task policy, with the STAND expert reused as the brake.
+In the leg-fault and weight walks the full method descends with the REST expert (the scenario's `descent`
+field): those regimes were evaluated with that configuration.
 
-**E091 reuses the weight-trained safety policies for a leg fault.** rest_hi and getup_v2 were trained with
-a carried load and a healthy leg, never with a derated one; E091 runs them at W = 0. It works because the
-robot lies down on the weak leg and only gets up after the leg has recovered (the return gate requires
-θ ≥ 0.99). The leg-specific experts (`go2_leg_*`, `go2_compound_*`) belong to the one-way demos of §0 only.
+**The leg-fault walk reuses the weight-trained safety policies for a leg fault.** `rest` and `getup` were
+trained with a carried load and a healthy leg, never with a derated one; the leg-fault walk runs them at
+W = 0. It works because the robot lies down on the weak leg and gets up only after the leg has recovered
+(the return gate requires θ ≥ 0.99). The leg-specific experts (`leg_stand`, `compound_*`) belong to the
+one-way certificate experiments of §0.
 
-## 2. Signal conditioning (shared by every automaton)
+## 2. Signal conditioning (shared by every scenario)
 
 - **EMA filtering**: `v̄ ← (1−α) v̄ + α V`, `ALPHA = 0.1` (≈ 0.2 s time constant), initialised to the first
-  reading (initialising at 0 caused spurious descents — E086 diagnosis).
-- **Sustain counters**: a condition must hold for K *consecutive* steps; one miss resets the count to 0.
-- **Warm-up**: no trigger fires during the spawn transient — `WARMUP = 50` steps (1 s) in E084/E086,
-  `t ≥ 100` (2 s) in E091/E092.
-- **Refractory**: after a trigger-driven switch (descend, get-up, abort), `REFRACT = 50` steps (1 s) before
-  the next trigger-driven switch.
-- **Target-set completion** (geometric, not learned) — a transition *finishes* only when the robot is
-  actually in the next mode's target set for **5 consecutive steps**:
-  - `in_rest_target`: base height < 0.15 m, tilt (max |g_x|, |g_y| of projected gravity) < 0.25,
+  reading (initialising at 0 makes the first second read as a collapse).
+- **Sustain counters**: a condition must hold for K *consecutive* steps; one miss resets the count.
+- **Arming**: no switch fires during the spawn transient — `arm_after = 50` steps (1 s) standing and in the
+  weight walk, 100 steps (2 s) in the payload and leg-fault walks.
+- **Refractory**: after a trigger, get-up or abort, `REFRACTORY = 50` steps (1 s) before the next one.
+- **Target-set completion** (geometric, not learned) — a transition *finishes* only when the robot is in
+  the next mode's target set for `SETTLE = 5` consecutive steps (`sim.in_rest_target`, `sim.in_stance_target`):
+  - settled rest: base height < 0.15 m, tilt (max |g_x|, |g_y| of projected gravity) < 0.25,
     |v| < 0.30 m/s, |ω| < 0.50 rad/s
-  - `in_stance_target`: base height > 0.20 m, tilt < 0.25, |v| < 0.30 m/s
+  - stance: base height > 0.20 m, tilt < 0.25, |v| < 0.30 m/s
 
-## 3. The full system ("ODD-conditioned", internally V2 / V2-REUSE)
+## 3. The full system (`odd`, "ODD-conditioned")
 
-### Standing form (E084 load waves, E086 single excursion)
+### Standing (scenarios `standing-square`, `-sine`, `-pulse`, `-period`)
 
 ```mermaid
 stateDiagram-v2
-    STAND --> DESCENDING: EMA V_stand < EPS_DN (-0.05) for K_DN=5 steps
-    DESCENDING --> REST: in_rest_target for 5 steps
-    REST --> GETTINGUP: EMA V_up > EPS_UP (0.10) for K_UP=15 steps AND belief W < 130 N (E086)
-    GETTINGUP --> STAND: in_stance_target for 5 steps
-    GETTINGUP --> DESCENDING: certified ABORT, EMA V_up < EPS_ABORT (-0.02) for 10 steps
+    STAND --> DESCENDING: EMA V_stand < -0.05 for 5 steps
+    DESCENDING --> REST: settled rest for 5 steps
+    REST --> GETTING_UP: EMA V_up > 0.10 for 15 steps AND belief W < 130 N (single excursions)
+    GETTING_UP --> STAND: stance for 5 steps
+    GETTING_UP --> DESCENDING: certified ABORT, EMA V_up < -0.02 for 10 steps
 ```
 
 - **Descent trigger = the STAND certificate collapsing.** Standing is in-distribution for the stance
   expert, so its own value is a usable detector here.
-- **Return = two keys.** The get-up funnel's own certificate `V_up` must say a get-up from *this* prone
-  pose is feasible, **and** the belief must say the ODD has cleared (`UP_W_GATE = 130 N`, the measured
-  stand-feasibility boundary). The belief gate is set by E086; the E084 *waves* runs use `UP_W_GATE = None`
-  (certificate only).
+- **Return = two keys.** The get-up funnel's own certificate `V_up` must say a get-up from *this* pose is
+  feasible, **and** the belief must say the ODD has cleared (`LOAD_NOMINAL = 130 N`, the measured
+  stand-feasibility boundary). The load *waves* run with the certificate alone (`gate_return=False`): under a
+  load that keeps coming back, the belief gate would keep the robot down for good.
 - **Abort**: if `V_up` collapses mid-get-up (e.g. the load returns), go back down — the get-up is never
   forced to completion.
 
-### Walking form, payload swap (E092 — the paper's main walking result)
+### Payload-swap walking (scenarios `payload-pulse`, `-period`, `-dip`)
 
 ```mermaid
 stateDiagram-v2
     WALK --> BRAKE: belief W >= 60 N for 3 steps
-    BRAKE --> DESCENDING: base speed < 0.35 m/s, or 40 steps (0.8 s) cap
-    DESCENDING --> REST: in_rest_target for 5 steps
-    REST --> GETTINGUP: EMA V_up > -0.30 for 15 steps AND W < 130 N sustained 100 steps (2 s)
-    GETTINGUP --> WALK: in_stance_target for 5 steps (walker gait clock reset)
-    GETTINGUP --> DESCENDING: ABORT, EMA V_up < -0.45 for 10 steps
+    BRAKE --> DESCENDING: base speed < 0.35 m/s, or 40 steps (0.8 s)
+    DESCENDING --> REST: settled rest for 5 steps
+    REST --> GETTING_UP: EMA V_up > -0.30 for 15 steps AND W < 130 N held for 100 steps (2 s)
+    GETTING_UP --> WALK: stance for 5 steps (walker gait clock restarts)
+    GETTING_UP --> DESCENDING: ABORT, EMA V_up < -0.45 for 10 steps
 ```
 
-Differences from the standing form, each forced by a measured failure:
+Differences from standing, each forced by a measured failure:
 
-1. **Belief-primary descent trigger** (`W_TRIG = 60`, the walking-ODD edge). `V_stand` evaluated on a
-   walking gait is off-distribution: used alone it false-fired on 20–25 % of healthy gaits and fired late
-   on the ramp (E092 run-1). The value is a certificate, not a fault detector.
-2. **BRAKE state.** A walker given a zero command freezes its gait clock and stumbles, so braking hands
-   the robot to the stance expert first, then descends once it is slow. Handoff mortality is
-   *gait-phase dependent* (mid-swing dies, stance survives); ~45 % of the remaining deaths are here.
-3. **Debounced return** (`UP_SUST = 100` steps = 2 s of W < 130 N). A 1.6 s false lightening of the load
-   (the `dip` schedule) must not bait the robot into standing under a returning crate.
-4. **Per-regime certificate thresholds** (`EPS_UP_92 = -0.30`, `EPS_ABORT_92 = -0.45`). Certificates are
-   ordinal off their training distribution; the get-up threshold was recalibrated on the rest poses that
-   *this* regime actually produces.
+1. **Belief-primary descent trigger** (60 N, the edge of the walker's comfortable load). `V_stand` read on a
+   walking gait is off-distribution: used alone it false-fired on 20–25 % of healthy gaits and fired late on
+   the ramp. The value is a certificate, not a fault detector.
+2. **BRAKE mode.** A walker given a zero command freezes its gait clock and stumbles, so braking hands the
+   robot to the stance expert, which stops it; the descent starts once it is slow. Handoff mortality depends
+   on the gait phase (mid-swing dies, stance survives); about half of the remaining deaths happen here.
+3. **Debounced return** (2 s of W < 130 N). The `dip` profile lightens the load for ~1.6 s mid-window; that
+   must not bait the robot into standing up under a returning crate.
+4. **Per-regime certificate thresholds** (`eps_up = -0.30`, `eps_abort = -0.45`). Certificates are ordinal
+   off their training distribution; the get-up threshold is calibrated on the rest poses that *this* regime
+   produces (`scripts/calibrate.py`).
 
-### Walking form, leg fault (E091)
+### Leg-fault walking (scenario `leg-fault`)
 
-Same skeleton as E092 with three changes:
+Same skeleton as the payload walk, with three changes:
 
-- **Descent trigger = torque-saturation residual**, not the payload belief and not the value.
-  `V_stand` is *blind* to unmodeled actuator faults (a hobbling robot reads `V̄ = +0.07`). The residual is
-  the worst-leg mean gap between demanded PD torque and achieved actuator force, normalised by the
-  nominal limit (`make_residual`); trigger when its EMA > `ERR_DEG = 0.03` for `K_DEG = 10` steps
-  (0.2 s), while walking. Healthy gait reads exactly 0.0000.
-- **Return belief = leg healthy** (`θ ≥ 0.99`) sustained `HEAL_SUST = 25` steps (0.5 s), plus
-  `EMA V_up > -0.35` for 15 steps; abort at `< -0.45`.
-- BRAKE runs the walker with a zero command (not stand_hi), and descent uses rest_hi ("V2-REUSE").
+- **Descent trigger = torque-saturation residual**, not a belief and not the value. `V_stand` is blind to
+  an unmodeled actuator fault (a hobbling robot reads `V̄ = +0.07`). The residual is the worst leg's mean gap
+  between the demanded PD torque and the achieved actuator force, normalised by the nominal limit
+  (`policies.LegResidual`); trigger when its EMA > 0.03 for 10 steps (0.2 s), while walking. A healthy gait
+  reads ≈ 0.
+- **Return belief = leg healthy** (θ ≥ 0.99) held 25 steps (0.5 s), plus `EMA V_up > -0.35` for 15 steps;
+  abort at `< -0.45`.
+- BRAKE runs the walker with a zero command, and the descent is flown by the REST expert.
 
-### Weight-excursion walking (E089 — boundary finding)
+### Weight walking (scenarios `weight-walk-pulse`, `-period` — the boundary case)
 
-Value-triggered (`EMA V_stand < EPS_DN_WALK = -0.15` for 10 steps, ROC-calibrated: 1.6 % false sits per
-30 s), descent by rest_hi, return as in E086 (`V_up > 0.10` for 15 steps and `W < 130`). No BRAKE state.
+Value-triggered (`EMA V_stand < -0.15` for 10 steps, calibrated to 1.6 % false descents per 30 s of
+healthy walking), descent by the REST expert, return as standing (`V_up > 0.10` for 15 steps and W < 130 N).
+No BRAKE mode.
 
-## 4. V1 vs V2 — what the ablation removes
+## 4. `direct` vs `odd` — what the ablation removes
 
-**V1 = "ODD-conditioned (direct)"** (batch-1 "bidirectional" automaton). **V2 = the full system**
-("ODD-conditioned"). They use the **same mode experts and the same descent trigger**. They differ in
-**how the robot comes back** — the certified bridge — and, in the V2 variant, in a dedicated descent
-funnel (V2-REUSE keeps V1's rest_hi descent, isolating the return):
+**`direct` = "ODD-conditioned (direct)"**; **`odd` = the full system ("ODD-conditioned")**. They use the
+**same mode experts and the same descent trigger**. They differ in **how the robot comes back** — the
+certified bridge — and, for `odd`, in a dedicated descent funnel (`odd-rest-descent` keeps `direct`'s descent
+by the REST expert, isolating the return):
 
-| | V1 — direct | V2 — certified bridge |
+| | `direct` | `odd` |
 |---|---|---|
-| states | 2 (stand/walk, rest) | 4–5 (+ DESCENDING, GETTINGUP, BRAKE) |
-| return trigger | `EMA V_stand > 0.15` for 25 steps (0.5 s) — the **stand** certificate read while lying prone, i.e. far off its training distribution | `EMA V_up >` per-regime threshold for 15 steps — the **get-up funnel's own** certificate, evaluated where it was trained |
-| belief gate on return | none (blind to whether the ODD has actually cleared) | required: W < 130 N (E086; sustained 2 s in E092) / leg healthy 0.5 s (E091) |
-| return maneuver | switch straight back to the stand/walk policy from prone (it must get up by itself) | dedicated get-up funnel, finishes only on reaching the stance target set |
+| modes | 2 (task, rest) + BRAKE when walking | + DESCENDING, GETTING_UP |
+| return trigger | `EMA V_stand > 0.15` for 25 steps (0.5 s) — the **stand** certificate read while lying down, far off its training distribution | `EMA V_up >` per-regime threshold for 15 steps — the **get-up funnel's own** certificate, read where it was trained |
+| belief gate on return | none (blind to whether the ODD has cleared) | required: W < 130 N (held 2 s in the payload walk) / leg healthy 0.5 s |
+| return maneuver | switch straight back to the task policy from lying down (it must get up by itself) | dedicated get-up funnel, finished only on reaching the stance set |
 | abort | none | `V_up` collapse → back to DESCENDING |
-| descent maneuver | rest_hi | dedicated descend_v4 funnel (V2) or rest_hi (V2-REUSE) |
+| descent maneuver | REST expert | dedicated descent funnel (`odd`) or REST expert (`odd-rest-descent`) |
 
-What each piece buys (evidence; standing numbers are survival over N=256, corrected accounting —
-single runs of E084/E086; E094 means are over 4 reps):
+What each piece buys is quantified in [FINDINGS.md](FINDINGS.md#5-results): the certified return (compare
+`direct` with `odd-rest-descent`, which descend the same way), the descent funnel (`odd-rest-descent` → `odd`),
+and the belief debounce in walking (the payload `dip` profile).
 
-- **The certified return bridge** (get-up funnel + `V_up` + belief gate + abort). Compare V1 with
-  V2-REUSE, which descend the same way (rest_hi) and differ only in the return: single benign/period
-  0.23 → 0.50, benign/pulse 0.30 → 0.40, waves benign/square 0.23 → 0.38. The certified get-up loses
-  **zero** robots in the GETTINGUP state in every corrected standing run.
-- **The dedicated descent funnel** (V2-REUSE → V2): benign/period 0.50 → 0.75, benign/pulse 0.40 →
-  0.50, waves benign/sine 0.21 → 0.30. Under gusts the two are within a few points, because those deaths
-  happen while still standing, before the trigger fires. (An earlier note that the two "tie everywhere"
-  predates the 2026-08-23 accounting correction.)
-- **Full V2 vs V1**, E094 4-rep means: single benign/period 0.74 vs 0.21, waves benign/square 0.46 vs
-  0.20, gusty/sine 0.10 vs 0.02.
-- **Belief debounce, walking**: in E092 `dip`, V1's blind return takes the bait and stands into the
-  returning crate (0.33 success / 0.36 safe) while V2 waits it out (0.40 / 0.40). On the honest `period`
-  ramp they tie (0.37/0.37 vs 0.38/0.39) — in walking the BRAKE handoff, not the return, dominates the
-  deaths.
-
-**Which internal arm is "ODD-conditioned" in each table:** V2 (dedicated descend_v4) in E084/E086/E092
-and the E094 seeds; V2-REUSE (rest_hi descent) in E089 and E091, which were run before descend_v4 was
-added to the walking automaton.
-
-**ONE-WAY** = V1's descent with no return at all (safe, zero task success after the ODD change).
-**STAND-ONLY / WALK-ONLY** = the task expert alone, **REST-ONLY** = the safety expert alone (the anchors:
-REST-ONLY is safe 1.00 in every scenario and succeeds 0.00).
+**`one-way`** = the same descent with no return at all (safe, zero task success after the ODD change).
+**`task-only`** = the task policy alone (STAND-ONLY / WALK-ONLY), **`rest-only`** = the REST expert alone (the
+anchors: REST-ONLY is safe in every scenario and never succeeds).
 
 ## 5. What "belief" means in these evaluations — read this before extending
 
-The return gate and the E092 descent trigger read the **true** ODD parameter (the scheduled W, or the
-scheduled leg θ for the "thermal sensor"). That is a stand-in for an estimator, justified by E018 (the
-set-membership belief B̂ shrinks onto the true payload in 0.10–0.20 s and empties out-of-distribution) but
-**not** closed-loop with it. The one genuinely estimated signal in the walking evaluations is E091's
-torque-saturation residual (descent side). Closing the loop with B̂ — and its detection latency — is open
-work (see `docs/STATUS.md`).
+The return gate and the payload descent trigger read the **true** ODD parameter (the scheduled W, or the
+scheduled leg θ as a thermal sensor would). That stands in for an estimator — e.g. a set-membership belief
+that matches the robot's trajectory against the dynamics of each candidate payload — and is **not** closed
+loop with one. The one estimated signal in the walking evaluations is the leg-fault walk's torque-saturation
+residual (descent side). Closing the loop with an estimator, including its detection latency, is open work.
 
 ## 6. Where the numbers live
 
-All value-dependent constants below are re-placed for new networks by `python scripts/calibrate.py`
-(procedure and rules: [TRAINING.md §6](TRAINING.md#6-recalibrating-the-switching-thresholds-after-any-retraining)).
-V1's return threshold is the named constant `V1_UP` / `V1_K_UP` in `E084_automaton.py`.
+The value-dependent constants are re-placed for new networks by `python scripts/calibrate.py` (rules and
+procedure: [TRAINING.md](TRAINING.md#6-calibrating-the-switching-thresholds)). Scenario fields are in
+`scenarios.py`; shared constants (`ALPHA`, `REFRACTORY`, `K_UP`, `K_ABORT`, `SETTLE`, `DIRECT_EPS_UP`,
+`DIRECT_K_UP`, `BRAKE_CAP`, `BRAKE_SLOW`, `LOAD_NOMINAL`, `LEG_HEALTHY`) at the top of `automaton.py`.
 
-| constant | E084 | E086 | E089 | E091 | E092 |
+| | standing waves | standing single | weight walk | leg-fault walk | payload walk |
 |---|---|---|---|---|---|
-| descent trigger | `V̄_stand<-0.05` ×5 | same | `V̄_stand<-0.15` ×10 | residual `>0.03` ×10 | `W≥60` ×3 |
-| return certificate | `V̄_up>0.10` ×15 | same | same | `V̄_up>-0.35` ×15 | `V̄_up>-0.30` ×15 |
-| return belief | — | `W<130` | `W<130` | `θ≥0.99` ×25 | `W<130` ×100 |
-| abort | `V̄_up<-0.02` ×10 | same | same | `V̄_up<-0.45` ×10 | `V̄_up<-0.45` ×10 |
-| V1 return | `V̄_stand>0.15` ×25 | same | same | same | same |
-| warm-up / refractory | 1 s / 1 s | 1 s / 1 s | 1 s / 1 s | 2 s / 1 s | 2 s / 1 s |
+| descent trigger | `V̄_stand < -0.05` ×5 | same | `V̄_stand < -0.15` ×10 | residual `> 0.03` ×10 | `W ≥ 60` ×3 |
+| return certificate | `V̄_up > 0.10` ×15 | same | same | `V̄_up > -0.35` ×15 | `V̄_up > -0.30` ×15 |
+| return belief | — | `W < 130` | `W < 130` | `θ ≥ 0.99` ×25 | `W < 130` ×100 |
+| abort | `V̄_up < -0.02` ×10 | same | same | `V̄_up < -0.45` ×10 | `V̄_up < -0.45` ×10 |
+| `direct` return | `V̄_stand > 0.15` ×25 | same | same | same | same |
+| brake | — | — | — | walker, zero command | STAND expert |
+| arming / refractory | 1 s / 1 s | 1 s / 1 s | 1 s / 1 s | 2 s / 1 s | 2 s / 1 s |
+| death | fell over (70°) or non-foot contact > 500 N | same | same | same | flip-over (80°) only |
