@@ -1,4 +1,4 @@
-"""Tests run from the repo root (checkpoint paths and submodule imports are repo-root relative)."""
+"""Tests run against the submodules under external/ (``source activate.sh`` first)."""
 import os
 import sys
 
@@ -6,16 +6,14 @@ import pytest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(REPO)
-for p in ("experiments", "external/go2_atomic_skills", "external/robot-safety-sandbox",
-          "external/safety-stable-baselines", REPO):
-    if p not in sys.path:
-        sys.path.insert(0, p)
+if REPO not in sys.path:
+    sys.path.insert(0, REPO)
 os.environ.setdefault("MUJOCO_GL", "egl")
 
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "gpu: needs a CUDA GPU (simulation rollouts)")
-    config.addinivalue_line("markers", "weights: needs the trained checkpoints (scripts/fetch_bundles.sh)")
+    config.addinivalue_line("markers", "weights: needs the trained checkpoints (scripts/fetch_weights.sh)")
 
 
 def pytest_collection_modifyitems(config, items):
